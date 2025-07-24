@@ -135,18 +135,69 @@ class VisualFlowExecutor:
     """Converts visual flows to executable agent chains."""
     
     def __init__(self, agents: Dict[str, Any]):
+        print(f"[VISUAL_EXECUTOR] Initializing VisualFlowExecutor with agents: {list(agents.keys())}")
         self.agents = agents
         self.chain_system = AgentChain(agents)
         self.quality_gates = []
+        print(f"[VISUAL_EXECUTOR] VisualFlowExecutor initialized successfully")
     
     def detect_manager_worker_patterns(self, visual_blocks: List[VisualBlock], 
                                      visual_connections: List[VisualConnection]) -> List[QualityGate]:
         """Detect manager-worker feedback loop patterns."""
+        print(f"[VISUAL_EXECUTOR] Starting manager-worker pattern detection")
+        print(f"[VISUAL_EXECUTOR] Input: {len(visual_blocks)} blocks, {len(visual_connections)} connections")
         
         quality_gates = []
         
         # Find feedback connections
         feedback_connections = [conn for conn in visual_connections if conn.type == 'feedback']
+        print(f"[VISUAL_EXECUTOR] Found {len(feedback_connections)} feedback connections")
+        
+        for fb_conn in feedback_connections:
+            print(f"[VISUAL_EXECUTOR] Processing feedback connection: {fb_conn.from_block} -> {fb_conn.to_block}")
+            
+            # Find the blocks involved
+            from_block = next((b for b in visual_blocks if b.id == fb_conn.from_block), None)
+            to_block = next((b for b in visual_blocks if b.id == fb_conn.to_block), None)
+            
+            if not from_block or not to_block:
+                print(f"[VISUAL_EXECUTOR] ERROR: Missing blocks for connection {fb_conn.id}")
+                continue
+                
+            print(f"[VISUAL_EXECUTOR] From block: {from_block.id} ({from_block.type})")
+            print(f"[VISUAL_EXECUTOR] To block: {to_block.id} ({to_block.type})")
+            
+            # Check if this looks like a manager-worker pattern
+            if from_block.type == 'agent' and to_block.type == 'agent':
+                from_role = from_block.config.get('role', '').lower()
+                to_role = to_block.config.get('role', '').lower()
+                
+                print(f"[VISUAL_EXECUTOR] Checking roles: from='{from_role}', to='{to_role}'")
+                
+                # Manager keywords
+                manager_keywords = ['manager', 'supervisor', 'lead', 'reviewer', 'coordinator']
+                worker_keywords = ['worker', 'developer', 'assistant', 'creator', 'executor']
+                
+                is_manager_worker = (
+                    any(keyword in from_role for keyword in manager_keywords) and
+                    any(keyword in to_role for keyword in worker_keywords)
+                )
+                
+                print(f"[VISUAL_EXECUTOR] Is manager-worker pattern: {is_manager_worker}")
+                
+                if is_manager_worker:
+                    quality_gate = QualityGate(
+                        manager_block=from_block.id,
+                        worker_block=to_block.id,
+                        max_iterations=3,
+                        quality_criteria=f"Quality review by {from_role} for {to_role} work"
+                    )
+                    quality_gates.append(quality_gate)
+                    print(f"[VISUAL_EXECUTOR] Created quality gate: {quality_gate.manager_block} -> {quality_gate.worker_block}")
+        
+        print(f"[VISUAL_EXECUTOR] Detected {len(quality_gates)} quality gates")
+        self.quality_gates = quality_gates
+        return quality_gates
         
         for fb_conn in feedback_connections:
             # Get the blocks involved
@@ -342,29 +393,49 @@ class VisualFlowExecutor:
                                 visual_connections: List[VisualConnection],
                                 initial_task: Task) -> Dict[str, Any]:
         """Execute a visual flow with enhanced manager-worker support."""
+        print(f"[VISUAL_EXECUTOR] Starting execute_visual_flow")
+        print(f"[VISUAL_EXECUTOR] Blocks: {[b.id for b in visual_blocks]}")
+        print(f"[VISUAL_EXECUTOR] Connections: {[(c.from_block, c.to_block, c.type) for c in visual_connections]}")
+        print(f"[VISUAL_EXECUTOR] Task: {initial_task.type} - {initial_task.content[:100]}...")
         
-        # Detect manager-worker patterns
-        quality_gates = self.detect_manager_worker_patterns(visual_blocks, visual_connections)
-        
-        # If we have manager-worker patterns, use specialized execution
-        if quality_gates:
-            return await self._execute_manager_worker_flow(
-                visual_blocks, visual_connections, initial_task, quality_gates
-            )
-        
-        # Otherwise, use standard chain execution
-        chain_id = self.convert_visual_flow_to_chain(visual_blocks, visual_connections)
-        result = await self.chain_system.execute_chain(chain_id, initial_task)
-        
-        # Add visual flow metadata
-        result['visual_flow'] = {
-            'blocks': len(visual_blocks),
-            'connections': len(visual_connections),
-            'chain_id': chain_id,
-            'execution_type': 'standard'
-        }
-        
-        return result
+        try:
+            # Detect manager-worker patterns
+            print(f"[VISUAL_EXECUTOR] Step 1: Detecting manager-worker patterns")
+            quality_gates = self.detect_manager_worker_patterns(visual_blocks, visual_connections)
+            
+            # If we have manager-worker patterns, use specialized execution
+            if quality_gates:
+                print(f"[VISUAL_EXECUTOR] Step 2: Using manager-worker execution path")
+                result = await self._execute_manager_worker_flow(
+                    visual_blocks, visual_connections, initial_task, quality_gates
+                )
+                print(f"[VISUAL_EXECUTOR] Manager-worker execution completed")
+                return result
+            
+            # Otherwise, use standard chain execution
+            print(f"[VISUAL_EXECUTOR] Step 2: Using standard chain execution path")
+            chain_id = self.convert_visual_flow_to_chain(visual_blocks, visual_connections)
+            print(f"[VISUAL_EXECUTOR] Created chain with ID: {chain_id}")
+            
+            result = await self.chain_system.execute_chain(chain_id, initial_task)
+            print(f"[VISUAL_EXECUTOR] Chain execution completed")
+            
+            # Add visual flow metadata
+            result['visual_flow'] = {
+                'blocks': len(visual_blocks),
+                'connections': len(visual_connections),
+                'chain_id': chain_id,
+                'execution_type': 'standard'
+            }
+            
+            print(f"[VISUAL_EXECUTOR] Final result prepared with metadata")
+            return result
+            
+        except Exception as e:
+            print(f"[VISUAL_EXECUTOR] ERROR in execute_visual_flow: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
     
     async def _execute_manager_worker_flow(self, visual_blocks: List[VisualBlock],
                                          visual_connections: List[VisualConnection],

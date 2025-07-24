@@ -1363,60 +1363,94 @@
         }
 
         function executeFlow() {
+            console.log('[FRONTEND] Starting executeFlow function');
+            
             if (blocks.size === 0) {
+                console.error('[FRONTEND] ERROR: No blocks in flow');
                 alert('Please create a flow first');
                 return;
             }
+            console.log(`[FRONTEND] Flow has ${blocks.size} blocks and ${connections.length} connections`);
             
             // Get task content from user
             const content = prompt('Enter the task content for this flow:');
-            if (!content) return;
+            if (!content) {
+                console.log('[FRONTEND] User cancelled - no content provided');
+                return;
+            }
+            console.log('[FRONTEND] Task content:', content);
             
             // Convert flow to backend format
-            const flowData = {
-                blocks: Array.from(blocks.values()),
-                connections: connections.map(conn => ({
+            console.log('[FRONTEND] Converting flow to backend format');
+            const blocksArray = Array.from(blocks.values());
+            console.log('[FRONTEND] Blocks array:', blocksArray);
+            
+            const connectionsArray = connections.map(conn => {
+                console.log(`[FRONTEND] Processing connection: ${conn.from} -> ${conn.to} (${conn.type})`);
+                return {
                     id: conn.id,
                     from: conn.from,
                     to: conn.to,
                     type: conn.type
-                })),
+                };
+            });
+            console.log('[FRONTEND] Connections array:', connectionsArray);
+            
+            const flowData = {
+                blocks: blocksArray,
+                connections: connectionsArray,
                 content: content,
                 type: 'visual_flow'
             };
+            console.log('[FRONTEND] Flow data prepared:', flowData);
             
             // Show loading indicator
+            console.log('[FRONTEND] Setting up loading indicator');
             const executeButton = document.querySelector('.toolbar-button.primary');
             const originalText = executeButton.innerHTML;
             executeButton.innerHTML = '⏳ Executing...';
             executeButton.disabled = true;
+            console.log('[FRONTEND] Button state updated');
             
             // Validate flow first
+            console.log('[FRONTEND] Step 1: Validating flow');
             fetch('/validate_visual_flow', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(flowData)
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log('[FRONTEND] Validation response status:', response.status);
+                console.log('[FRONTEND] Validation response ok:', response.ok);
+                return response.json();
+            })
             .then(validation => {
+                console.log('[FRONTEND] Validation result received:', validation);
+                
                 if (!validation.validation.valid) {
+                    console.error('[FRONTEND] ERROR: Validation failed');
+                    console.error('[FRONTEND] Validation errors:', validation.validation.errors);
                     const errors = validation.validation.errors.join('\n');
                     alert('Flow validation failed:\n' + errors);
                     return;
                 }
+                console.log('[FRONTEND] Validation passed');
                 
                 // Show validation info including manager-worker patterns
                 let validationMessage = '';
                 if (validation.validation.quality_gates_detected > 0) {
+                    console.log(`[FRONTEND] Quality gates detected: ${validation.validation.quality_gates_detected}`);
                     validationMessage += `✅ Manager-Worker Quality Control Detected!\n`;
                     validationMessage += `Found ${validation.validation.quality_gates_detected} quality gate(s):\n`;
                     validation.validation.manager_worker_patterns.forEach((pattern, index) => {
+                        console.log(`[FRONTEND] Pattern ${index + 1}: ${pattern.manager} -> ${pattern.worker}`);
                         validationMessage += `  ${index + 1}. Manager: ${pattern.manager} → Worker: ${pattern.worker} (max ${pattern.max_iterations} iterations)\n`;
                     });
                     validationMessage += '\n';
                 }
                 
                 if (validation.validation.warnings.length > 0) {
+                    console.log('[FRONTEND] Validation warnings:', validation.validation.warnings);
                     const warnings = validation.validation.warnings.join('\n');
                     validationMessage += 'Warnings:\n' + warnings + '\n\n';
                 }
@@ -1424,9 +1458,11 @@
                 validationMessage += 'Continue with execution?';
                 
                 if (validationMessage && !confirm(validationMessage)) {
+                    console.log('[FRONTEND] User cancelled execution after validation');
                     return;
                 }
                 
+                console.log('[FRONTEND] Step 2: Executing flow');
                 // Execute the flow
                 return fetch('/execute_visual_flow', {
                     method: 'POST',
@@ -1435,26 +1471,50 @@
                 });
             })
             .then(response => {
-                if (!response) return; // User cancelled
+                if (!response) {
+                    console.log('[FRONTEND] No response - user cancelled');
+                    return; // User cancelled
+                }
+                console.log('[FRONTEND] Execution response status:', response.status);
+                console.log('[FRONTEND] Execution response ok:', response.ok);
+                
+                if (!response.ok) {
+                    console.error('[FRONTEND] ERROR: Execution request failed');
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
                 return response.json();
             })
             .then(result => {
-                if (!result) return; // User cancelled
+                if (!result) {
+                    console.log('[FRONTEND] No result - user cancelled');
+                    return; // User cancelled
+                }
+                
+                console.log('[FRONTEND] Execution result received:', result);
                 
                 if (result.error) {
+                    console.error('[FRONTEND] ERROR: Execution error in result');
+                    console.error('[FRONTEND] Error details:', result.error);
                     alert('Execution error: ' + result.error);
                 } else {
+                    console.log('[FRONTEND] Step 3: Showing execution results');
                     // Show enhanced results in a new window
                     showExecutionResults(result, content);
+                    console.log('[FRONTEND] Results displayed successfully');
                 }
             })
             .catch(error => {
+                console.error('[FRONTEND] ERROR: Exception in executeFlow');
+                console.error('[FRONTEND] Error message:', error.message);
+                console.error('[FRONTEND] Error stack:', error.stack);
                 alert('Error executing flow: ' + error.message);
             })
             .finally(() => {
-                // Reset button
+                console.log('[FRONTEND] Restoring button state');
                 executeButton.innerHTML = originalText;
                 executeButton.disabled = false;
+                console.log('[FRONTEND] executeFlow function completed');
             });
         }
         

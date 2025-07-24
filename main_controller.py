@@ -7,12 +7,16 @@ from agent_gpt4o import AgentGPT4o
 from agent_o3pro import AgentO3Pro
 from agent_openmanus import AgentOpenManus
 from agent_chain import AgentChain, ChainBlock, FeedbackLoop, BlockType, FeedbackType
+from visual_flow_executor import VisualFlowExecutor
 
 class MainController:
     """Central orchestrator that dispatches tasks to specialized agents and manages chains."""
 
     def __init__(self):
+        print("[MAIN_CONTROLLER] Initializing MainController")
         self.queue: asyncio.Queue[Task] = asyncio.Queue()
+        
+        print("[MAIN_CONTROLLER] Setting up agents")
         self.agents: Dict[str, object] = {
             "Manager": AgentGrok4("AgentGrok4"),
             "CodeVerifier": AgentO3Pro("AgentO3Pro"),
@@ -23,10 +27,19 @@ class MainController:
                 "temperature": 0.3
             })
         }
+        print(f"[MAIN_CONTROLLER] Agents created: {list(self.agents.keys())}")
         
         # Initialize agent chain system
+        print("[MAIN_CONTROLLER] Initializing agent chain system")
         self.chain_system = AgentChain(self.agents)
+        
+        # Initialize visual flow executor
+        print("[MAIN_CONTROLLER] Initializing visual flow executor")
+        self.visual_executor = VisualFlowExecutor(self.agents)
+        
+        print("[MAIN_CONTROLLER] Setting up default chains")
         self._setup_default_chains()
+        print("[MAIN_CONTROLLER] MainController initialization complete")
 
     def _setup_default_chains(self):
         """Set up some default agent chains."""
