@@ -40,36 +40,66 @@ class ManagerWorkerLoop:
         self.max_iterations = max_iterations
         self.current_iteration = 0
         self.feedback_history = []
-        
-    async def execute_with_quality_control(self, task: Task) -> Dict[str, Any]:
+    
+    async def execute_with_quality_control(self, task: Task) -> dict:
         """Execute task with manager-worker quality control loop."""
+        import time
         
-        # Manager analyzes and delegates the task
+        print(f"[MANAGER_WORKER_LOOP] ========== STARTING MANAGER-WORKER EXECUTION ==========")
+        print(f"[MANAGER_WORKER_LOOP] Task: {task.type} - {task.content[:100]}...")
+        
+        # Manager delegates the task
+        print(f"[MANAGER_WORKER_LOOP] 📋 MANAGER DELEGATION PHASE...")
         delegation_task = Task(
             type="delegation",
-            content=f"Analyze this request and provide clear instructions for a worker: {task.content}",
+            content=f"Analyze this request and provide clear, detailed instructions for a worker to complete it:\n\n{task.content}",
             role="Manager"
         )
         
+        print(f"[MANAGER_WORKER_LOOP] Delegation task content: {delegation_task.content}")
+        print(f"[MANAGER_WORKER_LOOP] 🔄 CALLING MANAGER FOR DELEGATION...")
+        
+        delegation_start = time.time()
         delegation_result = await self.manager_agent.process_task(delegation_task)
+        delegation_end = time.time()
+        delegation_duration = delegation_end - delegation_start
+        
+        print(f"[MANAGER_WORKER_LOOP] ✅ Manager delegation completed in {delegation_duration:.2f} seconds")
+        print(f"[MANAGER_WORKER_LOOP] Delegation status: {delegation_result.get('status', 'unknown')}")
+        print(f"[MANAGER_WORKER_LOOP] Delegation result length: {len(str(delegation_result.get('result', '')))} chars")
+        print(f"[MANAGER_WORKER_LOOP] Delegation instructions: {str(delegation_result.get('result', ''))[:300]}...")
+        
+        if delegation_result.get('status') == 'error':
+            print(f"[MANAGER_WORKER_LOOP] ❌ Manager delegation failed: {delegation_result.get('result', '')}")
+            return {
+                'final_result': delegation_result,
+                'quality_approved': False,
+                'iterations': 0,
+                'max_iterations': self.max_iterations,
+                'feedback_history': [],
+                'delegation_instructions': delegation_result,
+                'status': 'delegation_failed'
+            }
         
         # Initialize work result
         work_result = None
         quality_approved = False
         
-        # Quality control loop with timeout protection
+        # Quality control loop with detailed API call logging
         import time
         start_time = time.time()
-        timeout_seconds = 25  # Leave 5 seconds buffer before gunicorn timeout
+        
+        print(f"[MANAGER_WORKER_LOOP] ========== STARTING QUALITY CONTROL LOOP ==========")
+        print(f"[MANAGER_WORKER_LOOP] Manager agent: {type(self.manager_agent).__name__}")
+        print(f"[MANAGER_WORKER_LOOP] Worker agent: {type(self.worker_agent).__name__}")
+        print(f"[MANAGER_WORKER_LOOP] Max iterations: {self.max_iterations}")
+        print(f"[MANAGER_WORKER_LOOP] Task type: {task.type}")
+        print(f"[MANAGER_WORKER_LOOP] Task content: {task.content[:200]}...")
         
         while not quality_approved and self.current_iteration < self.max_iterations:
-            # Check for timeout
-            if time.time() - start_time > timeout_seconds:
-                print(f"[MANAGER_WORKER_LOOP] TIMEOUT after {timeout_seconds} seconds")
-                break
-                
             self.current_iteration += 1
-            print(f"[MANAGER_WORKER_LOOP] Starting iteration {self.current_iteration}/{self.max_iterations}")
+            iteration_start = time.time()
+            print(f"[MANAGER_WORKER_LOOP] ========== ITERATION {self.current_iteration}/{self.max_iterations} ==========")
             
             # Worker executes the task
             if self.current_iteration == 1:
@@ -79,6 +109,7 @@ class ManagerWorkerLoop:
                     content=f"Manager Instructions: {delegation_result.get('result', '')}\n\nOriginal Request: {task.content}",
                     role="Worker"
                 )
+                print(f"[MANAGER_WORKER_LOOP] First iteration - using manager instructions")
             else:
                 # Subsequent iterations - include feedback
                 last_feedback = self.feedback_history[-1] if self.feedback_history else ""
@@ -87,10 +118,25 @@ class ManagerWorkerLoop:
                     content=f"Manager Instructions: {delegation_result.get('result', '')}\n\nOriginal Request: {task.content}\n\nPrevious Work: {work_result.get('result', '')}\n\nManager Feedback: {last_feedback}",
                     role="Worker"
                 )
+                print(f"[MANAGER_WORKER_LOOP] Iteration {self.current_iteration} - including feedback")
+                print(f"[MANAGER_WORKER_LOOP] Previous feedback: {last_feedback[:100]}...")
             
-            print(f"[MANAGER_WORKER_LOOP] Worker processing task...")
+            print(f"[MANAGER_WORKER_LOOP] Worker task content length: {len(worker_task.content)} chars")
+            print(f"[MANAGER_WORKER_LOOP] 🔄 CALLING WORKER AGENT...")
+            
+            worker_start = time.time()
             work_result = await self.worker_agent.process_task(worker_task)
-            print(f"[MANAGER_WORKER_LOOP] Worker completed task")
+            worker_end = time.time()
+            worker_duration = worker_end - worker_start
+            
+            print(f"[MANAGER_WORKER_LOOP] ✅ Worker completed in {worker_duration:.2f} seconds")
+            print(f"[MANAGER_WORKER_LOOP] Worker result status: {work_result.get('status', 'unknown')}")
+            print(f"[MANAGER_WORKER_LOOP] Worker result length: {len(str(work_result.get('result', '')))} chars")
+            print(f"[MANAGER_WORKER_LOOP] Worker result preview: {str(work_result.get('result', ''))[:200]}...")
+            
+            if work_result.get('status') == 'error':
+                print(f"[MANAGER_WORKER_LOOP] ❌ Worker failed: {work_result.get('result', '')}")
+                break
             
             # Manager reviews the work
             review_task = Task(
@@ -99,31 +145,76 @@ class ManagerWorkerLoop:
                 role="Manager"
             )
             
-            print(f"[MANAGER_WORKER_LOOP] Manager reviewing work...")
+            print(f"[MANAGER_WORKER_LOOP] Review task content length: {len(review_task.content)} chars")
+            print(f"[MANAGER_WORKER_LOOP] 🔍 CALLING MANAGER FOR REVIEW...")
+            
+            manager_start = time.time()
             review_result = await self.manager_agent.process_task(review_task)
-            print(f"[MANAGER_WORKER_LOOP] Manager completed review")
+            manager_end = time.time()
+            manager_duration = manager_end - manager_start
+            
+            print(f"[MANAGER_WORKER_LOOP] ✅ Manager review completed in {manager_duration:.2f} seconds")
+            print(f"[MANAGER_WORKER_LOOP] Manager review status: {review_result.get('status', 'unknown')}")
+            print(f"[MANAGER_WORKER_LOOP] Manager review length: {len(str(review_result.get('result', '')))} chars")
+            print(f"[MANAGER_WORKER_LOOP] Manager review: {str(review_result.get('result', ''))}")
+            
+            if review_result.get('status') == 'error':
+                print(f"[MANAGER_WORKER_LOOP] ❌ Manager review failed: {review_result.get('result', '')}")
+                break
             
             # Parse manager's decision
             review_text = review_result.get('result', '').lower()
-            print(f"[MANAGER_WORKER_LOOP] Manager decision: {review_text[:100]}...")
+            print(f"[MANAGER_WORKER_LOOP] 📋 ANALYZING MANAGER DECISION...")
+            print(f"[MANAGER_WORKER_LOOP] Review text (lowercase): {review_text}")
             
             # Check for approval keywords
             approval_keywords = ['approved', 'accept', 'good', 'satisfactory', 'complete', 'done', 'finished']
             rejection_keywords = ['reject', 'needs improvement', 'revise', 'redo', 'not good', 'insufficient']
             
-            if any(keyword in review_text for keyword in approval_keywords):
+            found_approval = [kw for kw in approval_keywords if kw in review_text]
+            found_rejection = [kw for kw in rejection_keywords if kw in review_text]
+            
+            print(f"[MANAGER_WORKER_LOOP] Found approval keywords: {found_approval}")
+            print(f"[MANAGER_WORKER_LOOP] Found rejection keywords: {found_rejection}")
+            
+            if found_approval:
                 quality_approved = True
-                print(f"[MANAGER_WORKER_LOOP] Work APPROVED on iteration {self.current_iteration}")
-            elif any(keyword in review_text for keyword in rejection_keywords) or 'feedback:' in review_text:
+                print(f"[MANAGER_WORKER_LOOP] ✅ WORK APPROVED on iteration {self.current_iteration}")
+            elif found_rejection or 'feedback:' in review_text:
                 # Extract feedback for next iteration
                 feedback = review_result.get('result', '')
                 self.feedback_history.append(feedback)
                 quality_approved = False
-                print(f"[MANAGER_WORKER_LOOP] Work REJECTED, feedback provided")
+                print(f"[MANAGER_WORKER_LOOP] ❌ WORK REJECTED, feedback provided")
+                print(f"[MANAGER_WORKER_LOOP] Feedback: {feedback}")
             else:
                 # If unclear, treat as approved to avoid infinite loops
                 quality_approved = True
-                print(f"[MANAGER_WORKER_LOOP] Unclear response, treating as APPROVED to avoid timeout")
+                print(f"[MANAGER_WORKER_LOOP] ⚠️ UNCLEAR RESPONSE, treating as APPROVED")
+            
+            iteration_end = time.time()
+            iteration_duration = iteration_end - iteration_start
+            total_duration = iteration_end - start_time
+            
+            print(f"[MANAGER_WORKER_LOOP] Iteration {self.current_iteration} completed in {iteration_duration:.2f} seconds")
+            print(f"[MANAGER_WORKER_LOOP] Total elapsed time: {total_duration:.2f} seconds")
+            print(f"[MANAGER_WORKER_LOOP] Quality approved: {quality_approved}")
+            
+            if quality_approved:
+                print(f"[MANAGER_WORKER_LOOP] 🎉 QUALITY CONTROL LOOP COMPLETED SUCCESSFULLY")
+                break
+            elif self.current_iteration >= self.max_iterations:
+                print(f"[MANAGER_WORKER_LOOP] ⏰ MAX ITERATIONS REACHED")
+                break
+            else:
+                print(f"[MANAGER_WORKER_LOOP] 🔄 CONTINUING TO NEXT ITERATION...")
+        
+        final_duration = time.time() - start_time
+        print(f"[MANAGER_WORKER_LOOP] ========== QUALITY CONTROL LOOP FINISHED ==========")
+        print(f"[MANAGER_WORKER_LOOP] Total duration: {final_duration:.2f} seconds")
+        print(f"[MANAGER_WORKER_LOOP] Final iterations: {self.current_iteration}")
+        print(f"[MANAGER_WORKER_LOOP] Final quality approved: {quality_approved}")
+        print(f"[MANAGER_WORKER_LOOP] Feedback history length: {len(self.feedback_history)}")
         
         return {
             'final_result': work_result,
