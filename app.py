@@ -217,44 +217,69 @@ def execute_visual_flow():
         task_content = data.get('content', '')
         task_type = data.get('type', 'general')
         
+        print(f"[DEBUG] Received blocks: {len(blocks_data)}, connections: {len(connections_data)}")
+        print(f"[DEBUG] Task content: {task_content[:100]}...")
+        
         if not blocks_data or not task_content:
             return jsonify({"error": "blocks and content are required"}), 400
         
-        # Convert to visual flow objects
-        visual_blocks = [
-            VisualBlock(
-                id=block['id'],
-                type=block['type'],
-                x=block['x'],
-                y=block['y'],
-                config=block['config']
-            )
-            for block in blocks_data
-        ]
+        # Convert to visual flow objects with error handling
+        visual_blocks = []
+        for block in blocks_data:
+            try:
+                visual_block = VisualBlock(
+                    id=block['id'],
+                    type=block['type'],
+                    x=block['x'],
+                    y=block['y'],
+                    config=block.get('config', {})
+                )
+                visual_blocks.append(visual_block)
+                print(f"[DEBUG] Created block: {visual_block.id} ({visual_block.type})")
+            except Exception as e:
+                print(f"[ERROR] Failed to create block {block.get('id', 'unknown')}: {str(e)}")
+                return jsonify({"error": f"Invalid block data: {str(e)}"}), 400
         
-        visual_connections = [
-            VisualConnection(
-                id=conn['id'],
-                from_block=conn['from'],
-                to_block=conn['to'],
-                type=conn['type']
-            )
-            for conn in connections_data
-        ]
+        visual_connections = []
+        for conn in connections_data:
+            try:
+                visual_connection = VisualConnection(
+                    id=conn['id'],
+                    from_block=conn['from'],
+                    to_block=conn['to'],
+                    type=conn['type']
+                )
+                visual_connections.append(visual_connection)
+                print(f"[DEBUG] Created connection: {visual_connection.from_block} -> {visual_connection.to_block} ({visual_connection.type})")
+            except Exception as e:
+                print(f"[ERROR] Failed to create connection {conn.get('id', 'unknown')}: {str(e)}")
+                return jsonify({"error": f"Invalid connection data: {str(e)}"}), 400
         
         # Create task
         task = Task(type=task_type, content=task_content)
+        print(f"[DEBUG] Created task: {task.type}")
         
         controller = get_controller()
+        print(f"[DEBUG] Got controller: {type(controller)}")
+        
+        # Check if visual_executor exists
+        if not hasattr(controller, 'visual_executor'):
+            print("[ERROR] Controller missing visual_executor")
+            return jsonify({"error": "Visual executor not initialized"}), 500
+        
+        print(f"[DEBUG] Visual executor: {type(controller.visual_executor)}")
         
         # Execute visual flow
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+        
+        print("[DEBUG] Starting visual flow execution...")
         result = loop.run_until_complete(
             controller.visual_executor.execute_visual_flow(
                 visual_blocks, visual_connections, task
             )
         )
+        print(f"[DEBUG] Execution completed: {type(result)}")
         
         return jsonify({
             "status": "executed",
@@ -262,6 +287,9 @@ def execute_visual_flow():
         })
         
     except Exception as e:
+        print(f"[ERROR] Visual flow execution failed: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
 @app.route('/validate_visual_flow', methods=['POST'])
