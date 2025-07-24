@@ -482,6 +482,8 @@ try:
     if os.path.exists(filepath):
         print(f"File verification: PowerPoint file exists and is ready")
         print(f"File size: {{os.path.getsize(filepath)}} bytes")
+        print(f"Download URL: /download/{{filename}}")
+        print(f"Direct download link: https://jdverbek.onrender.com/download/{{filename}}")
     else:
         print(f"File verification: PowerPoint file was not created properly")
     

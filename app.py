@@ -1,9 +1,9 @@
+from flask import Flask, render_template, request, jsonify, send_file, abort
 import asyncio
+import logging
 import os
-import json
-from flask import Flask, request, jsonify, render_template
+import time
 from main_controller import MainController
-from tasks import Task
 from visual_flow_executor import VisualFlowExecutor, VisualBlock, VisualConnection
 
 app = Flask(__name__)
@@ -345,6 +345,56 @@ def validate_visual_flow():
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Download files created by the system."""
+    try:
+        # Security: Only allow downloading from /tmp directory with specific patterns
+        if not filename.startswith('presentation_') or not (filename.endswith('.pptx') or filename.endswith('.txt')):
+            abort(404)
+        
+        file_path = os.path.join('/tmp', filename)
+        
+        if not os.path.exists(file_path):
+            abort(404)
+        
+        # Determine the correct mimetype
+        if filename.endswith('.pptx'):
+            mimetype = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        else:
+            mimetype = 'text/plain'
+        
+        return send_file(file_path, as_attachment=True, download_name=filename, mimetype=mimetype)
+    
+    except Exception as e:
+        print(f"[DOWNLOAD] Error downloading file {filename}: {e}")
+        abort(500)
+
+@app.route('/list_files')
+def list_files():
+    """List available files for download."""
+    try:
+        files = []
+        tmp_dir = '/tmp'
+        
+        if os.path.exists(tmp_dir):
+            for filename in os.listdir(tmp_dir):
+                if filename.startswith('presentation_') and (filename.endswith('.pptx') or filename.endswith('.txt')):
+                    file_path = os.path.join(tmp_dir, filename)
+                    file_stats = os.stat(file_path)
+                    files.append({
+                        'filename': filename,
+                        'size': file_stats.st_size,
+                        'created': time.ctime(file_stats.st_ctime),
+                        'download_url': f'/download/{filename}'
+                    })
+        
+        return jsonify({'files': files})
+    
+    except Exception as e:
+        print(f"[LIST_FILES] Error listing files: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

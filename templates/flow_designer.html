@@ -1689,15 +1689,60 @@
                     }
                     
                     htmlContent += `</div>`;
-                });
+                   }
                 
                 htmlContent += `</div>`;
             }
             
-            // Show raw execution data
+            // Extract and show download links
+            const downloadLinks = [];
+            if (result?.result?.final_result) {
+                Object.values(result.result.final_result).forEach(blockResult => {
+                    if (blockResult.result && typeof blockResult.result === 'string') {
+                        const downloadMatch = blockResult.result.match(/Direct download link: (https:\/\/[^\s]+)/g);
+                        if (downloadMatch) {
+                            downloadMatch.forEach(match => {
+                                const url = match.replace('Direct download link: ', '');
+                                const filename = url.split('/').pop();
+                                downloadLinks.push({ url, filename });
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Add download section if files were created
+            if (downloadLinks.length > 0) {
+                htmlContent += `
+                    <div class="section">
+                        <h3>📁 Created Files - Ready for Download</h3>
+                        <div style="background: #e8f5e8; padding: 20px; border-radius: 8px; border: 1px solid #c3e6cb;">
+                            <p style="margin-bottom: 15px; color: #2e7d32; font-weight: bold;">Your files have been created successfully! Click the links below to download:</p>
+                `;
+                
+                downloadLinks.forEach(link => {
+                    htmlContent += `
+                        <div style="margin-bottom: 15px; padding: 10px; background: white; border-radius: 5px; border: 1px solid #ddd;">
+                            <a href="${link.url}" download="${link.filename}" 
+                               style="display: inline-block; padding: 10px 20px; background-color: #4caf50; color: white; 
+                                      text-decoration: none; border-radius: 5px; margin-right: 15px; font-weight: bold;">
+                                ⬇️ Download ${link.filename}
+                            </a>
+                            <span style="color: #666; font-size: 0.9em;">File: ${link.filename}</span>
+                        </div>
+                    `;
+                });
+                
+                htmlContent += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Raw data section
             htmlContent += `
                 <div class="section">
-                    <h3>🔧 Raw Execution Data</h3>
+                    <h3>🔍 Raw Execution Data</h3>
                     <details>
                         <summary>Click to expand raw data</summary>
                         <div class="code">${JSON.stringify(result?.result || {}, null, 2)}</div>
