@@ -1461,6 +1461,35 @@
         function showExecutionResults(result, originalContent) {
             const resultWindow = window.open('', 'flowResult', 'width=1000,height=700,scrollbars=yes');
             
+            // Check if window opened successfully
+            if (!resultWindow) {
+                alert('Could not open results window. Please check your popup blocker settings.');
+                return;
+            }
+            
+            // Wait for window to be ready
+            resultWindow.onload = function() {
+                writeResultsToWindow(resultWindow, result, originalContent);
+            };
+            
+            // If window is already loaded, write immediately
+            if (resultWindow.document.readyState === 'complete') {
+                writeResultsToWindow(resultWindow, result, originalContent);
+            } else {
+                // Fallback: write after a short delay
+                setTimeout(() => {
+                    writeResultsToWindow(resultWindow, result, originalContent);
+                }, 100);
+            }
+        }
+        
+        function writeResultsToWindow(resultWindow, result, originalContent) {
+            // Double-check that window and document exist
+            if (!resultWindow || !resultWindow.document) {
+                console.error('Result window or document is null');
+                return;
+            }
+            
             let htmlContent = `
                 <html>
                 <head>
@@ -1486,24 +1515,24 @@
                 <body>
                     <div class="header">
                         <h1>🎯 Visual Flow Execution Results</h1>
-                        <p><strong>Original Request:</strong> ${originalContent}</p>
-                        <p><strong>Execution Type:</strong> ${result.result.visual_flow?.execution_type || 'Standard'}</p>
-                        <p><strong>Status:</strong> <span class="success">${result.status}</span></p>
+                        <p><strong>Original Request:</strong> ${originalContent || 'No content provided'}</p>
+                        <p><strong>Execution Type:</strong> ${result?.result?.visual_flow?.execution_type || 'Standard'}</p>
+                        <p><strong>Status:</strong> <span class="success">${result?.status || 'Unknown'}</span></p>
                     </div>
             `;
             
             // Show execution statistics
-            if (result.result.visual_flow) {
+            if (result?.result?.visual_flow) {
                 htmlContent += `
                     <div class="section">
                         <h3>📊 Execution Statistics</h3>
                         <div class="stats">
                             <div class="stat-card">
-                                <div class="stat-number">${result.result.visual_flow.blocks}</div>
+                                <div class="stat-number">${result.result.visual_flow.blocks || 0}</div>
                                 <div>Blocks Processed</div>
                             </div>
                             <div class="stat-card">
-                                <div class="stat-number">${result.result.visual_flow.connections}</div>
+                                <div class="stat-number">${result.result.visual_flow.connections || 0}</div>
                                 <div>Connections</div>
                             </div>
                 `;
@@ -1524,7 +1553,7 @@
             }
             
             // Show manager-worker execution details
-            if (result.result.execution_history) {
+            if (result?.result?.execution_history) {
                 htmlContent += `
                     <div class="section">
                         <h3>🔄 Execution History</h3>
@@ -1554,7 +1583,7 @@
             }
             
             // Show detailed results
-            if (result.result.final_result) {
+            if (result?.result?.final_result) {
                 htmlContent += `
                     <div class="section">
                         <h3>📋 Detailed Results</h3>
@@ -1566,7 +1595,7 @@
                             <h4>Block: ${blockId}</h4>
                     `;
                     
-                    if (blockResult.final_result) {
+                    if (blockResult?.final_result) {
                         // Manager-worker loop result
                         htmlContent += `
                             <p><strong>Status:</strong> <span class="${blockResult.quality_approved ? 'success' : 'warning'}">${blockResult.status}</span></p>
@@ -1611,7 +1640,7 @@
                     <h3>🔧 Raw Execution Data</h3>
                     <details>
                         <summary>Click to expand raw data</summary>
-                        <div class="code">${JSON.stringify(result.result, null, 2)}</div>
+                        <div class="code">${JSON.stringify(result?.result || {}, null, 2)}</div>
                     </details>
                 </div>
                 
@@ -1619,7 +1648,13 @@
                 </html>
             `;
             
-            resultWindow.document.write(htmlContent);
+            try {
+                resultWindow.document.write(htmlContent);
+                resultWindow.document.close();
+            } catch (error) {
+                console.error('Error writing to result window:', error);
+                alert('Error displaying results: ' + error.message);
+            }
         }
 
         function zoomIn() {
