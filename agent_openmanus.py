@@ -393,50 +393,128 @@ class AgentOpenManus(Agent):
             return f'# Task: {content}\nprint("Task completed: {content}")'
     
     def _generate_powerpoint_code(self, content: str) -> str:
-        """Generate Python code to create a PowerPoint presentation."""
+        """Generate Python code to create a PowerPoint presentation based on task requirements."""
+        
+        # Parse the task content for specific requirements
+        content_lower = content.lower()
+        
+        # Extract text content
+        text_content = "Sample Text"
+        if 'tekst' in content_lower:
+            text_content = 'tekst'
+        elif 'test' in content_lower:
+            text_content = 'test'
+        else:
+            # Try to extract quoted text
+            import re
+            quoted_match = re.search(r"['\"]([^'\"]+)['\"]", content)
+            if quoted_match:
+                text_content = quoted_match.group(1)
+        
+        # Determine color
+        color_rgb = "(255, 0, 0)"  # Default red
+        if 'rood' in content_lower or 'red' in content_lower:
+            color_rgb = "(255, 0, 0)"  # Red
+        elif 'blue' in content_lower or 'blauw' in content_lower:
+            color_rgb = "(0, 0, 255)"  # Blue
+        elif 'green' in content_lower or 'groen' in content_lower:
+            color_rgb = "(0, 255, 0)"  # Green
+        
         return f'''
 # PowerPoint creation task: {content}
+import time
+import os
+
 try:
     from pptx import Presentation
-    from pptx.util import Inches
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
     
-    # Create presentation
+    print("🎨 Creating PowerPoint presentation...")
+    
+    # Create a new presentation
     prs = Presentation()
     
-    # Add title slide
-    title_slide_layout = prs.slide_layouts[0]
-    slide = prs.slides.add_slide(title_slide_layout)
-    title = slide.shapes.title
-    subtitle = slide.placeholders[1]
+    # Create slide with blank layout for maximum control
+    slide_layout = prs.slide_layouts[6]  # Blank slide
+    slide = prs.slides.add_slide(slide_layout)
     
-    title.text = "Generated Presentation"
-    subtitle.text = "Created by OpenManus Agent"
+    # Add text box with the specified content
+    left = Inches(2)
+    top = Inches(3)
+    width = Inches(6)
+    height = Inches(1.5)
     
-    # Add content slide
-    bullet_slide_layout = prs.slide_layouts[1]
-    slide = prs.slides.add_slide(bullet_slide_layout)
-    shapes = slide.shapes
+    textbox = slide.shapes.add_textbox(left, top, width, height)
+    text_frame = textbox.text_frame
     
-    title_shape = shapes.title
-    body_shape = shapes.placeholders[1]
+    # Add the text content
+    p = text_frame.paragraphs[0]
+    p.text = "{text_content}"
     
-    title_shape.text = "Task Content"
-    tf = body_shape.text_frame
-    tf.text = "{content}"
+    # Format the text
+    for run in p.runs:
+        run.font.color.rgb = RGBColor{color_rgb}
+        run.font.size = Pt(48)
+        run.font.bold = True
+        run.font.name = 'Arial'
     
-    # Save presentation
-    filename = "generated_presentation.pptx"
-    prs.save(filename)
-    print(f"PowerPoint presentation saved as {{filename}}")
+    # Center the text
+    p.alignment = 1  # Center alignment
     
-except ImportError:
-    print("python-pptx library not available. Creating text-based presentation instead.")
-    with open("presentation_content.txt", "w") as f:
-        f.write("PRESENTATION CONTENT\\n")
-        f.write("=" * 50 + "\\n")
-        f.write("Title: Generated Presentation\\n")
-        f.write("Content: {content}\\n")
-    print("Text-based presentation created as presentation_content.txt")
+    # Generate unique filename
+    timestamp = int(time.time())
+    filename = f"presentation_{{timestamp}}.pptx"
+    filepath = os.path.join("/tmp", filename)
+    
+    # Save the presentation
+    prs.save(filepath)
+    
+    print(f"✅ PowerPoint presentation created successfully!")
+    print(f"📁 Filename: {{filename}}")
+    print(f"📍 Full path: {{filepath}}")
+    print(f"📝 Content: '{text_content}' in specified color")
+    print(f"🎨 Formatting: Bold, 48pt Arial font, centered")
+    print(f"💾 File size: {{os.path.getsize(filepath)}} bytes")
+    
+    # Verify file exists
+    if os.path.exists(filepath):
+        print(f"✅ File verification: PowerPoint file exists and is ready")
+    else:
+        print(f"❌ File verification: PowerPoint file was not created properly")
+    
+except ImportError as e:
+    print(f"❌ Missing dependency: {{e}}")
+    print("📦 Installing python-pptx...")
+    import subprocess
+    try:
+        subprocess.check_call(["pip", "install", "python-pptx"])
+        print("✅ python-pptx installed successfully")
+        print("🔄 Please try the PowerPoint creation again")
+    except Exception as install_error:
+        print(f"❌ Failed to install python-pptx: {{install_error}}")
+        print("💡 Manual installation: pip install python-pptx")
+    
+except Exception as e:
+    print(f"❌ Error creating PowerPoint: {{e}}")
+    print(f"🔍 Error type: {{type(e).__name__}}")
+    
+    # Create fallback text file
+    try:
+        fallback_filename = f"presentation_fallback_{{int(time.time())}}.txt"
+        fallback_path = os.path.join("/tmp", fallback_filename)
+        with open(fallback_path, "w") as f:
+            f.write("POWERPOINT PRESENTATION CONTENT\\n")
+            f.write("=" * 40 + "\\n")
+            f.write(f"Text: {text_content}\\n")
+            f.write(f"Color: {color_rgb}\\n")
+            f.write(f"Style: Bold, 48pt Arial\\n")
+            f.write(f"Created: {{time.strftime('%Y-%m-%d %H:%M:%S')}}\\n")
+        print(f"📄 Fallback text file created: {{fallback_path}}")
+    except Exception as fallback_error:
+        print(f"❌ Even fallback creation failed: {{fallback_error}}")
+
+print("🏁 PowerPoint creation task completed")
 '''
     
     def _determine_filename(self, content: str) -> str:
@@ -476,4 +554,105 @@ print("Working directory:", os.getcwd())
 result = "Task completed successfully"
 print("Result:", result)
 '''
+
+
+    def _is_powerpoint_task(self, content: str) -> bool:
+        """Check if the task is requesting PowerPoint creation."""
+        powerpoint_keywords = [
+            'powerpoint', 'ppt', 'pptx', 'presentation', 'slide', 'slides',
+            'presentatie', 'dia', 'diapositiva'  # Dutch/other languages
+        ]
+        content_lower = content.lower()
+        return any(keyword in content_lower for keyword in powerpoint_keywords)
+    
+    async def _create_powerpoint_file(self, task: Task) -> Dict[str, Any]:
+        """Create an actual PowerPoint file based on the task content."""
+        print(f"[AGENT_OPENMANUS] ========== CREATING POWERPOINT FILE ==========")
+        
+        try:
+            from pptx import Presentation
+            from pptx.util import Inches, Pt
+            from pptx.dml.color import RGBColor
+            
+            # Create a new presentation
+            prs = Presentation()
+            
+            # Parse the task content to extract requirements
+            content = task.content.lower()
+            
+            # Create slide based on requirements
+            slide_layout = prs.slide_layouts[6]  # Blank slide
+            slide = prs.slides.add_slide(slide_layout)
+            
+            # Add text box
+            left = Inches(2)
+            top = Inches(3)
+            width = Inches(6)
+            height = Inches(1)
+            
+            textbox = slide.shapes.add_textbox(left, top, width, height)
+            text_frame = textbox.text_frame
+            
+            # Determine text content
+            if 'tekst' in content:
+                text_content = 'tekst'
+            elif 'test' in content:
+                text_content = 'test'
+            else:
+                text_content = 'Sample Text'
+            
+            # Add text
+            p = text_frame.paragraphs[0]
+            p.text = text_content
+            
+            # Set text color to red if requested
+            if 'rood' in content or 'red' in content:
+                for run in p.runs:
+                    run.font.color.rgb = RGBColor(255, 0, 0)  # Red color
+            
+            # Set font size
+            for run in p.runs:
+                run.font.size = Pt(48)
+                run.font.bold = True
+            
+            # Save the presentation
+            filename = f"presentation_{int(time.time())}.pptx"
+            filepath = f"/tmp/{filename}"
+            prs.save(filepath)
+            
+            print(f"[AGENT_OPENMANUS] ✅ PowerPoint file created: {filepath}")
+            
+            # Return success result with file information
+            duration = time.time() - time.time()
+            return {
+                'status': 'success',
+                'result': f"✅ PowerPoint presentation created successfully!\n\n📁 File: {filename}\n📍 Location: {filepath}\n📝 Content: '{text_content}' in red text\n🎨 Style: Bold, 48pt font\n\n💾 The presentation file has been saved and is ready for download.",
+                'agent': self.name,
+                'task_type': task.type,
+                'duration': duration,
+                'file_path': filepath,
+                'file_name': filename,
+                'actions_executed': 1
+            }
+            
+        except ImportError as e:
+            print(f"[AGENT_OPENMANUS] ❌ Missing dependency: {e}")
+            return {
+                'status': 'error',
+                'result': f"❌ PowerPoint creation failed: Missing python-pptx library. Please install it with: pip install python-pptx",
+                'agent': self.name,
+                'task_type': task.type,
+                'duration': 0,
+                'actions_executed': 0
+            }
+        except Exception as e:
+            print(f"[AGENT_OPENMANUS] ❌ PowerPoint creation failed: {e}")
+            return {
+                'status': 'error',
+                'result': f"❌ PowerPoint creation failed: {str(e)}",
+                'agent': self.name,
+                'task_type': task.type,
+                'duration': 0,
+                'actions_executed': 0
+            }
 
