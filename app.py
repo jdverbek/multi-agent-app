@@ -5,6 +5,7 @@ import os
 import time
 from main_controller import MainController
 from visual_flow_executor import VisualFlowExecutor, VisualBlock, VisualConnection
+from tasks import Task
 
 app = Flask(__name__)
 
