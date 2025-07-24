@@ -253,36 +253,19 @@ def execute_visual_flow():
         
         controller = get_controller()
         
-        # Check if this is a simple task (< 5 blocks) for immediate execution
-        if len(visual_blocks) <= 4:
-            # Execute immediately for simple tasks
-            try:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                result = loop.run_until_complete(
-                    controller.visual_executor.execute_visual_flow(
-                        visual_blocks, visual_connections, task
-                    )
-                )
-                loop.close()
-                
-                return jsonify({
-                    "status": "executed",
-                    "result": result
-                })
-            except Exception as e:
-                return jsonify({"error": str(e)}), 500
-        else:
-            # Start background task for complex workflows
-            task_id = task_manager.start_task(
-                visual_blocks, visual_connections, task, controller
-            )
-            
-            return jsonify({
-                "status": "started",
-                "task_id": task_id,
-                "message": "Complex workflow started in background. Use /task_status/{task_id} to check progress."
-            })
+        # Force ALL tasks to use background processing to avoid timeout issues
+        # Even simple tasks can take >30 seconds with AI processing
+        task_id = task_manager.start_task(
+            visual_blocks, visual_connections, task, controller
+        )
+        
+        return jsonify({
+            "status": "started",
+            "task_id": task_id,
+            "message": f"Workflow started in background (estimated duration: up to 25 minutes). Use /task_status/{task_id} to check progress.",
+            "blocks_count": len(visual_blocks),
+            "connections_count": len(visual_connections)
+        })
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500

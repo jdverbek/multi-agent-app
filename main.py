@@ -1,26 +1,54 @@
-import asyncio
-from main_controller import MainController
-from tasks import Task
+#!/usr/bin/env python3
+"""
+Main entry point for the multi-agent application
+"""
 
-async def main():
-    controller = MainController()
+import os
+import sys
 
-    # Start the controller loop in the background
-    controller_task = asyncio.create_task(controller.run())
-
-    # Submit some example tasks
-    await controller.submit_task(Task(type="analyseer code", content="print('hi')", role="CodeVerifier"))
-    await controller.submit_task(Task(type="genereer script", content="data", role="Developer"))
-
-    # Wait a short time for tasks to be processed
-    await asyncio.sleep(0.5)
-
-    # Since this is an example, we cancel the controller loop
-    controller_task.cancel()
-    try:
-        await controller_task
-    except asyncio.CancelledError:
-        pass
+def main():
+    """Main entry point"""
+    # Check if we're running in production (Render) or development
+    if os.environ.get('RENDER'):
+        # Production: Use Gunicorn with proper configuration
+        import subprocess
+        
+        port = os.environ.get('PORT', '5000')
+        
+        # Start with Gunicorn using our configuration
+        cmd = [
+            'gunicorn',
+            '--config', 'gunicorn.conf.py',
+            '--bind', f'0.0.0.0:{port}',
+            'app:app'
+        ]
+        
+        print(f"🚀 Starting production server on port {port} with Gunicorn...")
+        print(f"Command: {' '.join(cmd)}")
+        
+        try:
+            subprocess.run(cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Error starting Gunicorn: {e}")
+            sys.exit(1)
+        except KeyboardInterrupt:
+            print("🛑 Server stopped by user")
+            sys.exit(0)
+    else:
+        # Development: Use Flask development server
+        from app import app
+        
+        port = int(os.environ.get('PORT', 5000))
+        
+        print(f"🔧 Starting development server on port {port}...")
+        print("⚠️  For production, set RENDER environment variable")
+        
+        app.run(
+            host='0.0.0.0',
+            port=port,
+            debug=True,
+            threaded=True
+        )
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()

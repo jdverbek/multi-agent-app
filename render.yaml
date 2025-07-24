@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: multi-agent-app
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python main.py
+    envVars:
+      - key: RENDER
+        value: "true"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
+    scaling:
+      minInstances: 1
+      maxInstances: 2
+    disk:
+      name: multi-agent-data
+      mountPath: /tmp
+      sizeGB: 1
+    healthCheckPath: /status
+    autoDeploy: true
+

@@ -1456,11 +1456,11 @@
                 }
                 
                 // Check if this is a complex workflow
-                const isComplexWorkflow = blocksArray.length > 4;
+                const isComplexWorkflow = blocksArray.length > 1; // All workflows now go to background
                 if (isComplexWorkflow) {
-                    validationMessage += '⚠️ Complex workflow detected (>4 blocks).\n';
-                    validationMessage += 'This will run in background and may take up to 25 minutes.\n';
-                    validationMessage += 'You will receive progress updates.\n\n';
+                    validationMessage += '⚠️ Workflow will run in background for reliability.\n';
+                    validationMessage += 'This prevents timeout issues and may take up to 25 minutes.\n';
+                    validationMessage += 'You will receive real-time progress updates.\n\n';
                 }
                 
                 validationMessage += 'Continue with execution?';
