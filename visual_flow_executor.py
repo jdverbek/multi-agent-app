@@ -106,20 +106,40 @@ class ManagerWorkerLoop:
                 # First iteration - use original task with manager's instructions
                 worker_task = Task(
                     type=task.type,
-                    content=f"Manager Instructions: {delegation_result.get('result', '')}\n\nOriginal Request: {task.content}",
+                    content=f"""MANAGER INSTRUCTIONS:
+{delegation_result.get('result', '')}
+
+ORIGINAL REQUEST:
+{task.content}
+
+TASK:
+Please complete the work according to the manager's instructions above. Focus on delivering actual results, not just instructions or explanations.""",
                     role="Worker"
                 )
                 print(f"[MANAGER_WORKER_LOOP] First iteration - using manager instructions")
             else:
-                # Subsequent iterations - include feedback
+                # Subsequent iterations - include detailed feedback
                 last_feedback = self.feedback_history[-1] if self.feedback_history else ""
                 worker_task = Task(
                     type=task.type,
-                    content=f"Manager Instructions: {delegation_result.get('result', '')}\n\nOriginal Request: {task.content}\n\nPrevious Work: {work_result.get('result', '')}\n\nManager Feedback: {last_feedback}",
+                    content=f"""MANAGER INSTRUCTIONS:
+{delegation_result.get('result', '')}
+
+ORIGINAL REQUEST:
+{task.content}
+
+PREVIOUS WORK:
+{work_result.get('result', '')}
+
+MANAGER FEEDBACK:
+{last_feedback}
+
+TASK:
+Based on the manager's detailed feedback above, please improve your work. Address each specific issue mentioned and implement the suggested improvements. Focus on delivering actual results, not just instructions.""",
                     role="Worker"
                 )
-                print(f"[MANAGER_WORKER_LOOP] Iteration {self.current_iteration} - including feedback")
-                print(f"[MANAGER_WORKER_LOOP] Previous feedback: {last_feedback[:100]}...")
+                print(f"[MANAGER_WORKER_LOOP] Iteration {self.current_iteration} - including detailed feedback")
+                print(f"[MANAGER_WORKER_LOOP] Previous feedback: {last_feedback[:200]}...")
             
             print(f"[MANAGER_WORKER_LOOP] Worker task content length: {len(worker_task.content)} chars")
             print(f"[MANAGER_WORKER_LOOP] 🔄 CALLING WORKER AGENT...")
@@ -141,7 +161,31 @@ class ManagerWorkerLoop:
             # Manager reviews the work
             review_task = Task(
                 type="quality_review",
-                content=f"Review this work and determine if it meets quality standards. Respond with either 'APPROVED' or 'NEEDS IMPROVEMENT: [specific feedback]':\n\nOriginal Request: {task.content}\n\nWorker's Output: {work_result.get('result', '')}\n\nIteration: {self.current_iteration}/{self.max_iterations}",
+                content=f"""Please conduct a thorough quality review of the worker's output and provide detailed feedback.
+
+ORIGINAL REQUEST:
+{task.content}
+
+WORKER'S OUTPUT:
+{work_result.get('result', '')}
+
+REVIEW CRITERIA:
+- Completeness: Does the output fully address the original request?
+- Accuracy: Is the information correct and reliable?
+- Quality: Is the work professional and well-executed?
+- Usability: Can the user actually use this output effectively?
+
+INSTRUCTIONS:
+1. If the work meets all criteria, respond with: "APPROVED: [brief explanation of why it's good]"
+2. If the work needs improvement, respond with: "NEEDS IMPROVEMENT" followed by:
+   - Specific issues identified
+   - Detailed suggestions for improvement
+   - Clear action items for the worker
+   - Examples of what good output should look like
+
+ITERATION: {self.current_iteration}/{self.max_iterations}
+
+Please provide your detailed review:""",
                 role="Manager"
             )
             
@@ -575,16 +619,18 @@ class VisualFlowExecutor:
                     print(f"[VISUAL_EXECUTOR] Manager block config: {manager_block.config}")
                     print(f"[VISUAL_EXECUTOR] Worker block config: {current_block.config}")
                     
-                    # Get agent based on model selection, not agent type
+                    # Get agent based on both agent type and model selection
                     manager_model = manager_block.config.get('model', 'gpt-4o')
+                    manager_agent_type = manager_block.config.get('agent', 'Manager')
                     worker_model = current_block.config.get('model', 'gpt-4o')
+                    worker_agent_type = current_block.config.get('agent', 'OpenManus')
                     
-                    print(f"[VISUAL_EXECUTOR] Manager model: {manager_model}")
-                    print(f"[VISUAL_EXECUTOR] Worker model: {worker_model}")
+                    print(f"[VISUAL_EXECUTOR] Manager model: {manager_model}, agent type: {manager_agent_type}")
+                    print(f"[VISUAL_EXECUTOR] Worker model: {worker_model}, agent type: {worker_agent_type}")
                     
-                    # Map models to agents
-                    manager_agent = self._get_agent_by_model(manager_model)
-                    worker_agent = self._get_agent_by_model(worker_model)
+                    # Map agents using both type and model
+                    manager_agent = self._get_agent_by_type_and_model(manager_agent_type, manager_model)
+                    worker_agent = self._get_agent_by_type_and_model(worker_agent_type, worker_model)
                     
                     print(f"[VISUAL_EXECUTOR] Manager agent: {type(manager_agent).__name__ if manager_agent else 'None'}")
                     print(f"[VISUAL_EXECUTOR] Worker agent: {type(worker_agent).__name__ if worker_agent else 'None'}")
@@ -665,7 +711,7 @@ class VisualFlowExecutor:
         """Get the appropriate agent based on the selected model."""
         print(f"[VISUAL_EXECUTOR] Mapping model '{model}' to agent")
         
-        # Map models to agents
+        # Map models to agents - prioritize OpenManus for worker tasks
         model_to_agent = {
             'gpt-4o': self.agents.get('Developer'),  # AgentGPT4o
             'claude-3': self.agents.get('Developer'),  # Use GPT4o as fallback for Claude
@@ -707,6 +753,24 @@ class VisualFlowExecutor:
         agent = self.agents.get('Developer')
         print(f"[VISUAL_EXECUTOR] Using default fallback: {model} -> {type(agent).__name__ if agent else 'None'}")
         return agent
+    
+    def _get_agent_by_type_and_model(self, agent_type: str, model: str):
+        """Get agent based on both agent type and model, prioritizing OpenManus for worker roles."""
+        print(f"[VISUAL_EXECUTOR] Mapping agent_type='{agent_type}' with model='{model}' to agent")
+        
+        # Check if this is a worker role that should use OpenManus
+        worker_types = ['openmanus', 'worker', 'creator', 'developer', 'assistant']
+        agent_type_lower = agent_type.lower()
+        
+        # If agent type is OpenManus or this is a worker role, prefer OpenManus
+        if agent_type_lower == 'openmanus' or any(worker_type in agent_type_lower for worker_type in worker_types):
+            openmanus_agent = self.agents.get('OpenManus')
+            if openmanus_agent:
+                print(f"[VISUAL_EXECUTOR] Using OpenManus for worker role: {agent_type} -> {type(openmanus_agent).__name__}")
+                return openmanus_agent
+        
+        # Otherwise use model-based mapping
+        return self._get_agent_by_model(model)
     
     def _find_next_agent_block(self, current_block_id: str, 
                              connections: List[VisualConnection],
