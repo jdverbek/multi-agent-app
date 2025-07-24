@@ -411,17 +411,19 @@ class AgentOpenManus(Agent):
             if quoted_match:
                 text_content = quoted_match.group(1)
         
-        # Determine color
-        color_rgb = "(255, 0, 0)"  # Default red
-        if 'rood' in content_lower or 'red' in content_lower:
+        # Determine color - default to yellow for "geel"
+        color_rgb = "(255, 255, 0)"  # Default yellow for "geel"
+        if 'geel' in content_lower or 'yellow' in content_lower:
+            color_rgb = "(255, 255, 0)"  # Yellow
+        elif 'rood' in content_lower or 'red' in content_lower:
             color_rgb = "(255, 0, 0)"  # Red
         elif 'blue' in content_lower or 'blauw' in content_lower:
             color_rgb = "(0, 0, 255)"  # Blue
         elif 'green' in content_lower or 'groen' in content_lower:
             color_rgb = "(0, 255, 0)"  # Green
         
-        return f'''
-# PowerPoint creation task: {content}
+        # Create safe Python code without syntax errors
+        code = f'''# PowerPoint creation task
 import time
 import os
 
@@ -430,16 +432,16 @@ try:
     from pptx.util import Inches, Pt
     from pptx.dml.color import RGBColor
     
-    print("🎨 Creating PowerPoint presentation...")
+    print("Creating PowerPoint presentation...")
     
     # Create a new presentation
     prs = Presentation()
     
-    # Create slide with blank layout for maximum control
+    # Create slide with blank layout
     slide_layout = prs.slide_layouts[6]  # Blank slide
     slide = prs.slides.add_slide(slide_layout)
     
-    # Add text box with the specified content
+    # Add text box
     left = Inches(2)
     top = Inches(3)
     width = Inches(6)
@@ -470,34 +472,34 @@ try:
     # Save the presentation
     prs.save(filepath)
     
-    print(f"✅ PowerPoint presentation created successfully!")
-    print(f"📁 Filename: {{filename}}")
-    print(f"📍 Full path: {{filepath}}")
-    print(f"📝 Content: '{text_content}' in specified color")
-    print(f"🎨 Formatting: Bold, 48pt Arial font, centered")
-    print(f"💾 File size: {{os.path.getsize(filepath)}} bytes")
+    print(f"PowerPoint presentation created successfully!")
+    print(f"Filename: {{filename}}")
+    print(f"Full path: {{filepath}}")
+    print(f"Content: '{text_content}' in specified color")
+    print(f"Formatting: Bold, 48pt Arial font, centered")
     
     # Verify file exists
     if os.path.exists(filepath):
-        print(f"✅ File verification: PowerPoint file exists and is ready")
+        print(f"File verification: PowerPoint file exists and is ready")
+        print(f"File size: {{os.path.getsize(filepath)}} bytes")
     else:
-        print(f"❌ File verification: PowerPoint file was not created properly")
+        print(f"File verification: PowerPoint file was not created properly")
     
 except ImportError as e:
-    print(f"❌ Missing dependency: {{e}}")
-    print("📦 Installing python-pptx...")
+    print(f"Missing dependency: {{e}}")
+    print("Installing python-pptx...")
     import subprocess
     try:
         subprocess.check_call(["pip", "install", "python-pptx"])
-        print("✅ python-pptx installed successfully")
-        print("🔄 Please try the PowerPoint creation again")
+        print("python-pptx installed successfully")
+        print("Please try the PowerPoint creation again")
     except Exception as install_error:
-        print(f"❌ Failed to install python-pptx: {{install_error}}")
-        print("💡 Manual installation: pip install python-pptx")
+        print(f"Failed to install python-pptx: {{install_error}}")
+        print("Manual installation required: pip install python-pptx")
     
 except Exception as e:
-    print(f"❌ Error creating PowerPoint: {{e}}")
-    print(f"🔍 Error type: {{type(e).__name__}}")
+    print(f"Error creating PowerPoint: {{e}}")
+    print(f"Error type: {{type(e).__name__}}")
     
     # Create fallback text file
     try:
@@ -505,17 +507,19 @@ except Exception as e:
         fallback_path = os.path.join("/tmp", fallback_filename)
         with open(fallback_path, "w") as f:
             f.write("POWERPOINT PRESENTATION CONTENT\\n")
-            f.write("=" * 40 + "\\n")
+            f.write("=" + "=" * 39 + "\\n")
             f.write(f"Text: {text_content}\\n")
             f.write(f"Color: {color_rgb}\\n")
             f.write(f"Style: Bold, 48pt Arial\\n")
             f.write(f"Created: {{time.strftime('%Y-%m-%d %H:%M:%S')}}\\n")
-        print(f"📄 Fallback text file created: {{fallback_path}}")
+        print(f"Fallback text file created: {{fallback_path}}")
     except Exception as fallback_error:
-        print(f"❌ Even fallback creation failed: {{fallback_error}}")
+        print(f"Even fallback creation failed: {{fallback_error}}")
 
-print("🏁 PowerPoint creation task completed")
+print("PowerPoint creation task completed")
 '''
+        
+        return code
     
     def _determine_filename(self, content: str) -> str:
         """Determine appropriate filename based on task content."""
