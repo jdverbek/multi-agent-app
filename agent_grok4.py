@@ -9,6 +9,24 @@ CHAT_URL_GROQ = "https://api.groq.com/openai/v1/chat/completions"
 class AgentGrok4(Agent):
     """Agent wrapper for the Grok-4 API."""
 
+    async def process_task(self, task: Task) -> dict:
+        """Process task and return result in standard format."""
+        try:
+            result = await self.handle(task)
+            return {
+                'status': 'success',
+                'result': result,
+                'agent': 'AgentGrok4',
+                'task_type': task.type
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'result': f"Error processing task: {str(e)}",
+                'agent': 'AgentGrok4',
+                'task_type': task.type
+            }
+
     async def handle(self, task: Task) -> str:
         """Call Grok's API with the task content."""
         headers = {

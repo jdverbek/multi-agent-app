@@ -9,6 +9,24 @@ CHAT_URL_OPENAI = "https://api.openai.com/v1/chat/completions"
 class AgentO3Pro(Agent):
     """Agent wrapper for the O3Pro API."""
 
+    async def process_task(self, task: Task) -> dict:
+        """Process task and return result in standard format."""
+        try:
+            result = await self.handle(task)
+            return {
+                'status': 'success',
+                'result': result,
+                'agent': 'AgentO3Pro',
+                'task_type': task.type
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'result': f"Error processing task: {str(e)}",
+                'agent': 'AgentO3Pro',
+                'task_type': task.type
+            }
+
     async def handle(self, task: Task) -> str:
         """Call OpenAI's GPT-3.5 (or O3Pro) model with the task content."""
         headers = {

@@ -13,6 +13,24 @@ class AgentOpenManus(Agent):
         self.config = config or {}
         self.base_url = self.config.get('base_url', 'http://localhost:8000')
         self.api_key = self.config.get('api_key', os.getenv('MANUS_API_KEY', ''))
+    
+    async def process_task(self, task: Task) -> dict:
+        """Process task and return result in standard format."""
+        try:
+            result = await self.handle(task)
+            return {
+                'status': 'success',
+                'result': result,
+                'agent': 'AgentOpenManus',
+                'task_type': task.type
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'result': f"Error processing task: {str(e)}",
+                'agent': 'AgentOpenManus',
+                'task_type': task.type
+            }
         
     async def handle(self, task: Task) -> str:
         """Process a task using OpenManus capabilities."""
