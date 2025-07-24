@@ -7,7 +7,7 @@ import tempfile
 import time
 from typing import Any, Dict, List, Optional
 
-from agent_base import AgentBase
+from agent_base import Agent
 from tasks import Task
 
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ class ToolCollection:
             'message': 'Task terminated by agent'
         }
 
-class AgentOpenManus(AgentBase):
+class AgentOpenManus(Agent):
     """
     OpenManus agent implementation following the official OpenManus pattern.
     
