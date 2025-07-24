@@ -1,5 +1,6 @@
 import asyncio
 import os
+import json
 from flask import Flask, request, jsonify, render_template
 from main_controller import MainController
 from tasks import Task
@@ -29,11 +30,47 @@ def home():
 @app.route('/status')
 def status():
     """Get application status."""
+    controller = get_controller()
     return jsonify({
         "status": "running",
         "controller_active": controller is not None,
-        "available_agents": ["Manager", "CodeVerifier", "Developer"]
+        "available_agents": controller.get_available_agents(),
+        "available_chains": controller.get_available_chains()
     })
+
+@app.route('/agents')
+def get_agents():
+    """Get list of available agents."""
+    controller = get_controller()
+    return jsonify({
+        "agents": controller.get_available_agents()
+    })
+
+@app.route('/chains')
+def get_chains():
+    """Get list of available chains."""
+    controller = get_controller()
+    chains = controller.get_available_chains()
+    chain_definitions = {}
+    
+    for chain_id in chains:
+        chain_definitions[chain_id] = controller.get_chain_definition(chain_id)
+    
+    return jsonify({
+        "chains": chains,
+        "definitions": chain_definitions
+    })
+
+@app.route('/chains/<chain_id>')
+def get_chain_definition(chain_id):
+    """Get definition of a specific chain."""
+    controller = get_controller()
+    definition = controller.get_chain_definition(chain_id)
+    
+    if definition:
+        return jsonify(definition)
+    else:
+        return jsonify({"error": "Chain not found"}), 404
 
 @app.route('/submit', methods=['POST'])
 def submit_task():
@@ -46,30 +83,112 @@ def submit_task():
         task_type = data.get('type', 'general')
         content = data.get('content', '')
         role = data.get('role', 'Developer')
+        chain_id = data.get('chain_id')  # Optional chain execution
         
         if not content:
             return jsonify({"error": "Content is required"}), 400
         
-        # Create and submit task
-        task = Task(type=task_type, content=content, role=role)
+        # Create task
+        task = Task(
+            type=task_type, 
+            content=content, 
+            role=role,
+            chain_id=chain_id
+        )
+        
         controller = get_controller()
         
         # Submit task asynchronously
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(controller.submit_task(task))
         
-        # Wait a bit for processing (in a real app, you'd want proper async handling)
-        loop.run_until_complete(asyncio.sleep(1))
+        if chain_id:
+            # Execute chain
+            result = loop.run_until_complete(controller.execute_chain(chain_id, task))
+            return jsonify({
+                "status": "chain_executed",
+                "chain_id": chain_id,
+                "result": result
+            })
+        else:
+            # Regular task submission
+            loop.run_until_complete(controller.submit_task(task))
+            
+            # Wait a bit for processing
+            loop.run_until_complete(asyncio.sleep(1))
+            
+            return jsonify({
+                "status": "submitted",
+                "task": {
+                    "type": task_type,
+                    "content": content,
+                    "role": role,
+                    "response": getattr(task, 'response', 'Processing...')
+                }
+            })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/chains', methods=['POST'])
+def create_chain():
+    """Create a custom agent chain."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        chain_id = data.get('chain_id')
+        blocks_config = data.get('blocks', [])
+        feedback_config = data.get('feedback_loops', [])
+        
+        if not chain_id or not blocks_config:
+            return jsonify({"error": "chain_id and blocks are required"}), 400
+        
+        controller = get_controller()
+        success = controller.create_custom_chain(chain_id, blocks_config, feedback_config)
+        
+        if success:
+            return jsonify({
+                "status": "created",
+                "chain_id": chain_id,
+                "message": "Chain created successfully"
+            })
+        else:
+            return jsonify({"error": "Failed to create chain"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/execute_chain', methods=['POST'])
+def execute_chain():
+    """Execute a specific agent chain."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        chain_id = data.get('chain_id')
+        content = data.get('content', '')
+        task_type = data.get('type', 'general')
+        
+        if not chain_id or not content:
+            return jsonify({"error": "chain_id and content are required"}), 400
+        
+        # Create task for chain execution
+        task = Task(type=task_type, content=content)
+        
+        controller = get_controller()
+        
+        # Execute chain
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(controller.execute_chain(chain_id, task))
         
         return jsonify({
-            "status": "submitted",
-            "task": {
-                "type": task_type,
-                "content": content,
-                "role": role,
-                "response": getattr(task, 'response', 'Processing...')
-            }
+            "status": "executed",
+            "chain_id": chain_id,
+            "result": result
         })
         
     except Exception as e:

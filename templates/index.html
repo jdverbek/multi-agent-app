@@ -3,16 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Multi-Agent Application</title>
+    <title>Multi-Agent Chain System</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
+            margin: 0;
             padding: 20px;
             background-color: #f5f5f5;
         }
         .container {
+            max-width: 1200px;
+            margin: 0 auto;
             background-color: white;
             padding: 30px;
             border-radius: 10px;
@@ -21,6 +22,30 @@
         h1 {
             color: #333;
             text-align: center;
+            margin-bottom: 30px;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 2px solid #ddd;
+            margin-bottom: 30px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            font-size: 16px;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            border-bottom-color: #007bff;
+            color: #007bff;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
         }
         .form-group {
             margin-bottom: 20px;
@@ -36,6 +61,7 @@
             border: 1px solid #ddd;
             border-radius: 5px;
             font-size: 16px;
+            box-sizing: border-box;
         }
         textarea {
             height: 100px;
@@ -49,9 +75,16 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
+            margin-right: 10px;
         }
         button:hover {
             background-color: #0056b3;
+        }
+        button.secondary {
+            background-color: #6c757d;
+        }
+        button.secondary:hover {
+            background-color: #545b62;
         }
         .response {
             margin-top: 20px;
@@ -60,58 +93,500 @@
             border-left: 4px solid #007bff;
             border-radius: 5px;
         }
-        .endpoints {
-            margin-top: 30px;
-            padding: 20px;
-            background-color: #e9ecef;
+        .chain-builder {
+            border: 1px solid #ddd;
             border-radius: 5px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .block {
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+        }
+        .block-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .block-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .remove-block {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .feedback-loop {
+            border: 1px solid #28a745;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8fff9;
+        }
+        .chain-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .chain-card {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            background-color: #f9f9f9;
+        }
+        .chain-card h3 {
+            margin-top: 0;
+            color: #007bff;
+        }
+        .status-info {
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 768px) {
+            .two-column {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Multi-Agent Application</h1>
-        <p>Submit tasks to specialized AI agents for processing.</p>
+        <h1>🤖 Multi-Agent Chain System</h1>
         
-        <form id="taskForm">
-            <div class="form-group">
-                <label for="taskType">Task Type:</label>
-                <input type="text" id="taskType" name="type" placeholder="e.g., analyseer code, genereer script" required>
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('simple')">Simple Task</button>
+            <button class="tab" onclick="showTab('chains')">Chain Execution</button>
+            <button class="tab" onclick="showTab('builder')">Chain Builder</button>
+            <button class="tab" onclick="showTab('status')">System Status</button>
+        </div>
+
+        <!-- Simple Task Tab -->
+        <div id="simple" class="tab-content active">
+            <h2>Submit Simple Task</h2>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label for="taskType">Task Type:</label>
+                    <input type="text" id="taskType" name="type" placeholder="e.g., analyseer code, genereer script" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="content">Content:</label>
+                    <textarea id="content" name="content" placeholder="Enter your task content here..." required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role">Agent Role:</label>
+                    <select id="role" name="role">
+                        <option value="Developer">Developer (GPT-4o)</option>
+                        <option value="CodeVerifier">Code Verifier (O3Pro)</option>
+                        <option value="Manager">Manager (Grok-4)</option>
+                        <option value="OpenManus">OpenManus (Multi-capability)</option>
+                    </select>
+                </div>
+                
+                <button type="submit">Submit Task</button>
+            </form>
+        </div>
+
+        <!-- Chain Execution Tab -->
+        <div id="chains" class="tab-content">
+            <h2>Execute Agent Chains</h2>
+            
+            <div id="chainsList" class="chain-list">
+                <!-- Chains will be loaded here -->
             </div>
             
             <div class="form-group">
-                <label for="content">Content:</label>
-                <textarea id="content" name="content" placeholder="Enter your task content here..." required></textarea>
-            </div>
-            
-            <div class="form-group">
-                <label for="role">Agent Role:</label>
-                <select id="role" name="role">
-                    <option value="Developer">Developer (GPT-4o)</option>
-                    <option value="CodeVerifier">Code Verifier (O3Pro)</option>
-                    <option value="Manager">Manager (Grok-4)</option>
+                <label for="chainSelect">Select Chain:</label>
+                <select id="chainSelect">
+                    <option value="">Loading chains...</option>
                 </select>
             </div>
             
-            <button type="submit">Submit Task</button>
-        </form>
-        
+            <div class="form-group">
+                <label for="chainContent">Task Content:</label>
+                <textarea id="chainContent" placeholder="Enter the task content for the chain to process..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="chainTaskType">Task Type:</label>
+                <input type="text" id="chainTaskType" placeholder="e.g., code_development, analysis" value="general">
+            </div>
+            
+            <button onclick="executeChain()">Execute Chain</button>
+        </div>
+
+        <!-- Chain Builder Tab -->
+        <div id="builder" class="tab-content">
+            <h2>Build Custom Agent Chain</h2>
+            
+            <div class="two-column">
+                <div>
+                    <h3>Chain Configuration</h3>
+                    <div class="form-group">
+                        <label for="chainId">Chain ID:</label>
+                        <input type="text" id="chainId" placeholder="my_custom_chain">
+                    </div>
+                    
+                    <h3>Blocks</h3>
+                    <div id="blocksContainer" class="chain-builder">
+                        <!-- Blocks will be added here -->
+                    </div>
+                    
+                    <button onclick="addBlock()">Add Block</button>
+                    <button onclick="addFeedbackLoop()" class="secondary">Add Feedback Loop</button>
+                </div>
+                
+                <div>
+                    <h3>Feedback Loops</h3>
+                    <div id="feedbackContainer" class="chain-builder">
+                        <!-- Feedback loops will be added here -->
+                    </div>
+                    
+                    <button onclick="createChain()">Create Chain</button>
+                    <button onclick="clearBuilder()" class="secondary">Clear All</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Tab -->
+        <div id="status" class="tab-content">
+            <h2>System Status</h2>
+            <div id="statusInfo" class="status-info">
+                Loading status...
+            </div>
+            
+            <h3>Available Agents</h3>
+            <div id="agentsList"></div>
+            
+            <h3>Available Chains</h3>
+            <div id="chainsStatusList"></div>
+        </div>
+
         <div id="response" class="response" style="display: none;">
             <h3>Response:</h3>
             <div id="responseContent"></div>
         </div>
-        
-        <div class="endpoints">
-            <h3>API Endpoints:</h3>
-            <ul>
-                <li><strong>GET /</strong> - Health check and web interface</li>
-                <li><strong>GET /status</strong> - Application status</li>
-                <li><strong>POST /submit</strong> - Submit a task (JSON: {type, content, role})</li>
-            </ul>
-        </div>
     </div>
 
     <script>
+        let blockCounter = 0;
+        let feedbackCounter = 0;
+        let availableAgents = [];
+        let availableChains = [];
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            if (tabName === 'status') {
+                loadStatus();
+            } else if (tabName === 'chains') {
+                loadChains();
+            }
+        }
+
+        // Load system status
+        async function loadStatus() {
+            try {
+                const response = await fetch('/status');
+                const data = await response.json();
+                
+                document.getElementById('statusInfo').innerHTML = `
+                    <p><strong>Status:</strong> ${data.status}</p>
+                    <p><strong>Controller Active:</strong> ${data.controller_active}</p>
+                `;
+                
+                availableAgents = data.available_agents || [];
+                availableChains = data.available_chains || [];
+                
+                document.getElementById('agentsList').innerHTML = availableAgents.map(agent => 
+                    `<span style="display: inline-block; background: #007bff; color: white; padding: 5px 10px; margin: 5px; border-radius: 3px;">${agent}</span>`
+                ).join('');
+                
+                document.getElementById('chainsStatusList').innerHTML = availableChains.map(chain => 
+                    `<span style="display: inline-block; background: #28a745; color: white; padding: 5px 10px; margin: 5px; border-radius: 3px;">${chain}</span>`
+                ).join('');
+                
+            } catch (error) {
+                document.getElementById('statusInfo').innerHTML = `<p style="color: red;">Error loading status: ${error.message}</p>`;
+            }
+        }
+
+        // Load available chains
+        async function loadChains() {
+            try {
+                const response = await fetch('/chains');
+                const data = await response.json();
+                
+                const chainSelect = document.getElementById('chainSelect');
+                chainSelect.innerHTML = '<option value="">Select a chain...</option>';
+                
+                data.chains.forEach(chain => {
+                    const option = document.createElement('option');
+                    option.value = chain;
+                    option.textContent = chain;
+                    chainSelect.appendChild(option);
+                });
+                
+                // Display chain cards
+                const chainsList = document.getElementById('chainsList');
+                chainsList.innerHTML = '';
+                
+                Object.entries(data.definitions).forEach(([chainId, definition]) => {
+                    const card = document.createElement('div');
+                    card.className = 'chain-card';
+                    card.innerHTML = `
+                        <h3>${chainId}</h3>
+                        <p><strong>Blocks:</strong> ${definition.blocks?.length || 0}</p>
+                        <p><strong>Feedback Loops:</strong> ${definition.feedback_loops?.length || 0}</p>
+                        <button onclick="executeSpecificChain('${chainId}')">Execute</button>
+                    `;
+                    chainsList.appendChild(card);
+                });
+                
+            } catch (error) {
+                console.error('Error loading chains:', error);
+            }
+        }
+
+        // Execute chain
+        async function executeChain() {
+            const chainId = document.getElementById('chainSelect').value;
+            const content = document.getElementById('chainContent').value;
+            const taskType = document.getElementById('chainTaskType').value;
+            
+            if (!chainId || !content) {
+                alert('Please select a chain and enter content');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/execute_chain', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chain_id: chainId,
+                        content: content,
+                        type: taskType
+                    })
+                });
+                
+                const result = await response.json();
+                showResponse(result);
+                
+            } catch (error) {
+                showResponse({ error: error.message });
+            }
+        }
+
+        // Execute specific chain
+        function executeSpecificChain(chainId) {
+            document.getElementById('chainSelect').value = chainId;
+            showTab('chains');
+        }
+
+        // Add block to chain builder
+        function addBlock() {
+            blockCounter++;
+            const container = document.getElementById('blocksContainer');
+            
+            const blockDiv = document.createElement('div');
+            blockDiv.className = 'block';
+            blockDiv.id = `block_${blockCounter}`;
+            
+            blockDiv.innerHTML = `
+                <div class="block-header">
+                    <span class="block-title">Block ${blockCounter}</span>
+                    <button class="remove-block" onclick="removeBlock('block_${blockCounter}')">Remove</button>
+                </div>
+                <div class="form-group">
+                    <label>Block ID:</label>
+                    <input type="text" id="blockId_${blockCounter}" value="block_${blockCounter}">
+                </div>
+                <div class="form-group">
+                    <label>Type:</label>
+                    <select id="blockType_${blockCounter}">
+                        <option value="agent">Agent</option>
+                        <option value="condition">Condition</option>
+                        <option value="merge">Merge</option>
+                        <option value="split">Split</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Agent Role:</label>
+                    <select id="blockRole_${blockCounter}">
+                        <option value="">Select agent...</option>
+                        <option value="Developer">Developer</option>
+                        <option value="CodeVerifier">CodeVerifier</option>
+                        <option value="Manager">Manager</option>
+                        <option value="OpenManus">OpenManus</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Next Blocks (comma-separated):</label>
+                    <input type="text" id="blockNext_${blockCounter}" placeholder="block_2,block_3">
+                </div>
+            `;
+            
+            container.appendChild(blockDiv);
+        }
+
+        // Add feedback loop
+        function addFeedbackLoop() {
+            feedbackCounter++;
+            const container = document.getElementById('feedbackContainer');
+            
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = 'feedback-loop';
+            feedbackDiv.id = `feedback_${feedbackCounter}`;
+            
+            feedbackDiv.innerHTML = `
+                <div class="block-header">
+                    <span class="block-title">Feedback Loop ${feedbackCounter}</span>
+                    <button class="remove-block" onclick="removeFeedback('feedback_${feedbackCounter}')">Remove</button>
+                </div>
+                <div class="form-group">
+                    <label>Loop ID:</label>
+                    <input type="text" id="feedbackId_${feedbackCounter}" value="feedback_${feedbackCounter}">
+                </div>
+                <div class="form-group">
+                    <label>Type:</label>
+                    <select id="feedbackType_${feedbackCounter}">
+                        <option value="review">Review</option>
+                        <option value="refine">Refine</option>
+                        <option value="validate">Validate</option>
+                        <option value="iterate">Iterate</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reviewer Role:</label>
+                    <select id="feedbackReviewer_${feedbackCounter}">
+                        <option value="Manager">Manager</option>
+                        <option value="CodeVerifier">CodeVerifier</option>
+                        <option value="Developer">Developer</option>
+                        <option value="OpenManus">OpenManus</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Target Block:</label>
+                    <input type="text" id="feedbackTarget_${feedbackCounter}" placeholder="block_1">
+                </div>
+                <div class="form-group">
+                    <label>Criteria:</label>
+                    <textarea id="feedbackCriteria_${feedbackCounter}" placeholder="Review criteria..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Max Iterations:</label>
+                    <input type="number" id="feedbackMaxIter_${feedbackCounter}" value="2" min="1" max="5">
+                </div>
+            `;
+            
+            container.appendChild(feedbackDiv);
+        }
+
+        // Remove block
+        function removeBlock(blockId) {
+            document.getElementById(blockId).remove();
+        }
+
+        // Remove feedback loop
+        function removeFeedback(feedbackId) {
+            document.getElementById(feedbackId).remove();
+        }
+
+        // Create chain
+        async function createChain() {
+            const chainId = document.getElementById('chainId').value;
+            if (!chainId) {
+                alert('Please enter a chain ID');
+                return;
+            }
+            
+            // Collect blocks
+            const blocks = [];
+            document.querySelectorAll('.block').forEach(blockDiv => {
+                const id = blockDiv.id.split('_')[1];
+                const nextBlocks = document.getElementById(`blockNext_${id}`).value
+                    .split(',').map(s => s.trim()).filter(s => s);
+                
+                blocks.push({
+                    id: document.getElementById(`blockId_${id}`).value,
+                    type: document.getElementById(`blockType_${id}`).value,
+                    agent_role: document.getElementById(`blockRole_${id}`).value || null,
+                    next_blocks: nextBlocks
+                });
+            });
+            
+            // Collect feedback loops
+            const feedbackLoops = [];
+            document.querySelectorAll('.feedback-loop').forEach(feedbackDiv => {
+                const id = feedbackDiv.id.split('_')[1];
+                
+                feedbackLoops.push({
+                    id: document.getElementById(`feedbackId_${id}`).value,
+                    type: document.getElementById(`feedbackType_${id}`).value,
+                    reviewer_role: document.getElementById(`feedbackReviewer_${id}`).value,
+                    target_block: document.getElementById(`feedbackTarget_${id}`).value,
+                    criteria: document.getElementById(`feedbackCriteria_${id}`).value,
+                    max_iterations: parseInt(document.getElementById(`feedbackMaxIter_${id}`).value)
+                });
+            });
+            
+            try {
+                const response = await fetch('/chains', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chain_id: chainId,
+                        blocks: blocks,
+                        feedback_loops: feedbackLoops
+                    })
+                });
+                
+                const result = await response.json();
+                showResponse(result);
+                
+                if (result.status === 'created') {
+                    clearBuilder();
+                }
+                
+            } catch (error) {
+                showResponse({ error: error.message });
+            }
+        }
+
+        // Clear builder
+        function clearBuilder() {
+            document.getElementById('chainId').value = '';
+            document.getElementById('blocksContainer').innerHTML = '';
+            document.getElementById('feedbackContainer').innerHTML = '';
+            blockCounter = 0;
+            feedbackCounter = 0;
+        }
+
+        // Simple task form submission
         document.getElementById('taskForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -125,27 +600,45 @@
             try {
                 const response = await fetch('/submit', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(data)
                 });
                 
                 const result = await response.json();
+                showResponse(result);
                 
-                document.getElementById('responseContent').innerHTML = `
+            } catch (error) {
+                showResponse({ error: error.message });
+            }
+        });
+
+        // Show response
+        function showResponse(result) {
+            const responseDiv = document.getElementById('response');
+            const contentDiv = document.getElementById('responseContent');
+            
+            if (result.error) {
+                contentDiv.innerHTML = `<p style="color: red;"><strong>Error:</strong> ${result.error}</p>`;
+            } else if (result.status === 'chain_executed' || result.status === 'executed') {
+                contentDiv.innerHTML = `
+                    <p><strong>Status:</strong> ${result.status}</p>
+                    <p><strong>Chain ID:</strong> ${result.chain_id}</p>
+                    <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto;">${JSON.stringify(result.result, null, 2)}</pre>
+                `;
+            } else {
+                contentDiv.innerHTML = `
                     <p><strong>Status:</strong> ${result.status}</p>
                     <p><strong>Task Type:</strong> ${result.task?.type}</p>
                     <p><strong>Role:</strong> ${result.task?.role}</p>
-                    <p><strong>Response:</strong> ${result.task?.response || result.error}</p>
+                    <p><strong>Response:</strong> ${result.task?.response || result.message}</p>
                 `;
-                document.getElementById('response').style.display = 'block';
-                
-            } catch (error) {
-                document.getElementById('responseContent').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
-                document.getElementById('response').style.display = 'block';
             }
-        });
+            
+            responseDiv.style.display = 'block';
+        }
+
+        // Load initial status
+        loadStatus();
     </script>
 </body>
 </html>
