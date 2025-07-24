@@ -1,6 +1,6 @@
 import asyncio
-from .main_controller import MainController
-from .tasks import Task
+from main_controller import MainController
+from tasks import Task
 
 async def main():
     controller = MainController()

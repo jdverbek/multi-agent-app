@@ -1,8 +1,8 @@
 import asyncio
 import os
 import requests
-from .agent_base import Agent
-from .tasks import Task
+from agent_base import Agent
+from tasks import Task
 
 CHAT_URL_OPENAI = "https://api.openai.com/v1/chat/completions"
 

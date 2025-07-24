@@ -1,10 +1,10 @@
 import asyncio
 from typing import Dict
 
-from .tasks import Task
-from .agent_grok4 import AgentGrok4
-from .agent_gpt4o import AgentGPT4o
-from .agent_o3pro import AgentO3Pro
+from tasks import Task
+from agent_grok4 import AgentGrok4
+from agent_gpt4o import AgentGPT4o
+from agent_o3pro import AgentO3Pro
 
 class MainController:
     """Central orchestrator that dispatches tasks to specialized agents."""

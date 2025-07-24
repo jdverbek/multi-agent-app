@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Application</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            border-radius: 5px;
+        }
+        .endpoints {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #e9ecef;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-Agent Application</h1>
+        <p>Submit tasks to specialized AI agents for processing.</p>
+        
+        <form id="taskForm">
+            <div class="form-group">
+                <label for="taskType">Task Type:</label>
+                <input type="text" id="taskType" name="type" placeholder="e.g., analyseer code, genereer script" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="content">Content:</label>
+                <textarea id="content" name="content" placeholder="Enter your task content here..." required></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="role">Agent Role:</label>
+                <select id="role" name="role">
+                    <option value="Developer">Developer (GPT-4o)</option>
+                    <option value="CodeVerifier">Code Verifier (O3Pro)</option>
+                    <option value="Manager">Manager (Grok-4)</option>
+                </select>
+            </div>
+            
+            <button type="submit">Submit Task</button>
+        </form>
+        
+        <div id="response" class="response" style="display: none;">
+            <h3>Response:</h3>
+            <div id="responseContent"></div>
+        </div>
+        
+        <div class="endpoints">
+            <h3>API Endpoints:</h3>
+            <ul>
+                <li><strong>GET /</strong> - Health check and web interface</li>
+                <li><strong>GET /status</strong> - Application status</li>
+                <li><strong>POST /submit</strong> - Submit a task (JSON: {type, content, role})</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('taskForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const data = {
+                type: formData.get('type'),
+                content: formData.get('content'),
+                role: formData.get('role')
+            };
+            
+            try {
+                const response = await fetch('/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                document.getElementById('responseContent').innerHTML = `
+                    <p><strong>Status:</strong> ${result.status}</p>
+                    <p><strong>Task Type:</strong> ${result.task?.type}</p>
+                    <p><strong>Role:</strong> ${result.task?.role}</p>
+                    <p><strong>Response:</strong> ${result.task?.response || result.error}</p>
+                `;
+                document.getElementById('response').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('responseContent').innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+                document.getElementById('response').style.display = 'block';
+            }
+        });
+    </script>
+</body>
+</html>
+
