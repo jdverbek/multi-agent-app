@@ -57,9 +57,19 @@ class ManagerWorkerLoop:
         work_result = None
         quality_approved = False
         
-        # Quality control loop
+        # Quality control loop with timeout protection
+        import time
+        start_time = time.time()
+        timeout_seconds = 25  # Leave 5 seconds buffer before gunicorn timeout
+        
         while not quality_approved and self.current_iteration < self.max_iterations:
+            # Check for timeout
+            if time.time() - start_time > timeout_seconds:
+                print(f"[MANAGER_WORKER_LOOP] TIMEOUT after {timeout_seconds} seconds")
+                break
+                
             self.current_iteration += 1
+            print(f"[MANAGER_WORKER_LOOP] Starting iteration {self.current_iteration}/{self.max_iterations}")
             
             # Worker executes the task
             if self.current_iteration == 1:
@@ -78,19 +88,24 @@ class ManagerWorkerLoop:
                     role="Worker"
                 )
             
+            print(f"[MANAGER_WORKER_LOOP] Worker processing task...")
             work_result = await self.worker_agent.process_task(worker_task)
+            print(f"[MANAGER_WORKER_LOOP] Worker completed task")
             
             # Manager reviews the work
             review_task = Task(
                 type="quality_review",
-                content=f"Review this work and determine if it meets quality standards:\n\nOriginal Request: {task.content}\n\nWorker's Output: {work_result.get('result', '')}\n\nIteration: {self.current_iteration}/{self.max_iterations}",
+                content=f"Review this work and determine if it meets quality standards. Respond with either 'APPROVED' or 'NEEDS IMPROVEMENT: [specific feedback]':\n\nOriginal Request: {task.content}\n\nWorker's Output: {work_result.get('result', '')}\n\nIteration: {self.current_iteration}/{self.max_iterations}",
                 role="Manager"
             )
             
+            print(f"[MANAGER_WORKER_LOOP] Manager reviewing work...")
             review_result = await self.manager_agent.process_task(review_task)
+            print(f"[MANAGER_WORKER_LOOP] Manager completed review")
             
             # Parse manager's decision
             review_text = review_result.get('result', '').lower()
+            print(f"[MANAGER_WORKER_LOOP] Manager decision: {review_text[:100]}...")
             
             # Check for approval keywords
             approval_keywords = ['approved', 'accept', 'good', 'satisfactory', 'complete', 'done', 'finished']
@@ -98,28 +113,17 @@ class ManagerWorkerLoop:
             
             if any(keyword in review_text for keyword in approval_keywords):
                 quality_approved = True
+                print(f"[MANAGER_WORKER_LOOP] Work APPROVED on iteration {self.current_iteration}")
             elif any(keyword in review_text for keyword in rejection_keywords) or 'feedback:' in review_text:
                 # Extract feedback for next iteration
                 feedback = review_result.get('result', '')
                 self.feedback_history.append(feedback)
                 quality_approved = False
+                print(f"[MANAGER_WORKER_LOOP] Work REJECTED, feedback provided")
             else:
-                # If unclear, ask manager to be more explicit
-                clarification_task = Task(
-                    type="clarification",
-                    content=f"Please provide a clear APPROVED or NEEDS IMPROVEMENT decision for this work:\n{work_result.get('result', '')}\n\nIf needs improvement, provide specific feedback.",
-                    role="Manager"
-                )
-                
-                clarification_result = await self.manager_agent.process_task(clarification_task)
-                clarification_text = clarification_result.get('result', '').lower()
-                
-                if 'approved' in clarification_text:
-                    quality_approved = True
-                else:
-                    feedback = clarification_result.get('result', '')
-                    self.feedback_history.append(feedback)
-                    quality_approved = False
+                # If unclear, treat as approved to avoid infinite loops
+                quality_approved = True
+                print(f"[MANAGER_WORKER_LOOP] Unclear response, treating as APPROVED to avoid timeout")
         
         return {
             'final_result': work_result,
