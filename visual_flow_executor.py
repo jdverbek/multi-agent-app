@@ -477,8 +477,22 @@ class VisualFlowExecutor:
                 manager_block = next((b for b in visual_blocks if b.id == quality_gate.manager_block), None)
                 
                 if manager_block:
-                    manager_agent = self.agents.get(manager_block.config.get('agent', 'Manager'))
-                    worker_agent = self.agents.get(current_block.config.get('agent', 'Developer'))
+                    print(f"[VISUAL_EXECUTOR] Manager block config: {manager_block.config}")
+                    print(f"[VISUAL_EXECUTOR] Worker block config: {current_block.config}")
+                    
+                    # Get agent based on model selection, not agent type
+                    manager_model = manager_block.config.get('model', 'gpt-4o')
+                    worker_model = current_block.config.get('model', 'gpt-4o')
+                    
+                    print(f"[VISUAL_EXECUTOR] Manager model: {manager_model}")
+                    print(f"[VISUAL_EXECUTOR] Worker model: {worker_model}")
+                    
+                    # Map models to agents
+                    manager_agent = self._get_agent_by_model(manager_model)
+                    worker_agent = self._get_agent_by_model(worker_model)
+                    
+                    print(f"[VISUAL_EXECUTOR] Manager agent: {type(manager_agent).__name__ if manager_agent else 'None'}")
+                    print(f"[VISUAL_EXECUTOR] Worker agent: {type(worker_agent).__name__ if worker_agent else 'None'}")
                     
                     if manager_agent and worker_agent:
                         loop_executor = ManagerWorkerLoop(
@@ -505,7 +519,16 @@ class VisualFlowExecutor:
                             )
             else:
                 # Standard agent execution
-                agent = self.agents.get(current_block.config.get('agent', 'Developer'))
+                print(f"[VISUAL_EXECUTOR] Standard execution for block: {current_block.id}")
+                print(f"[VISUAL_EXECUTOR] Block config: {current_block.config}")
+                
+                # Get agent based on model selection, not agent type
+                model = current_block.config.get('model', 'gpt-4o')
+                print(f"[VISUAL_EXECUTOR] Selected model: {model}")
+                
+                agent = self._get_agent_by_model(model)
+                print(f"[VISUAL_EXECUTOR] Selected agent: {type(agent).__name__ if agent else 'None'}")
+                
                 if agent:
                     block_task = Task(
                         type=current_task.type,
@@ -542,6 +565,53 @@ class VisualFlowExecutor:
                 'execution_type': 'manager_worker_enhanced'
             }
         }
+    
+    def _get_agent_by_model(self, model: str):
+        """Get the appropriate agent based on the selected model."""
+        print(f"[VISUAL_EXECUTOR] Mapping model '{model}' to agent")
+        
+        # Map models to agents
+        model_to_agent = {
+            'gpt-4o': self.agents.get('Developer'),  # AgentGPT4o
+            'claude-3': self.agents.get('Developer'),  # Use GPT4o as fallback for Claude
+            'grok': self.agents.get('Manager'),  # AgentGrok4
+            'o3-mini': self.agents.get('CodeVerifier'),  # AgentO3Pro
+            'openmanus': self.agents.get('OpenManus'),  # AgentOpenManus
+        }
+        
+        # Try exact match first
+        agent = model_to_agent.get(model)
+        if agent:
+            print(f"[VISUAL_EXECUTOR] Found exact match: {model} -> {type(agent).__name__}")
+            return agent
+        
+        # Try partial matches
+        model_lower = model.lower()
+        if 'gpt' in model_lower or '4o' in model_lower:
+            agent = self.agents.get('Developer')
+            print(f"[VISUAL_EXECUTOR] GPT model detected: {model} -> {type(agent).__name__ if agent else 'None'}")
+            return agent
+        elif 'claude' in model_lower:
+            agent = self.agents.get('Developer')  # Use GPT4o as fallback
+            print(f"[VISUAL_EXECUTOR] Claude model detected: {model} -> {type(agent).__name__ if agent else 'None'}")
+            return agent
+        elif 'grok' in model_lower:
+            agent = self.agents.get('Manager')
+            print(f"[VISUAL_EXECUTOR] Grok model detected: {model} -> {type(agent).__name__ if agent else 'None'}")
+            return agent
+        elif 'o3' in model_lower:
+            agent = self.agents.get('CodeVerifier')
+            print(f"[VISUAL_EXECUTOR] O3 model detected: {model} -> {type(agent).__name__ if agent else 'None'}")
+            return agent
+        elif 'manus' in model_lower:
+            agent = self.agents.get('OpenManus')
+            print(f"[VISUAL_EXECUTOR] OpenManus model detected: {model} -> {type(agent).__name__ if agent else 'None'}")
+            return agent
+        
+        # Default fallback to GPT4o
+        agent = self.agents.get('Developer')
+        print(f"[VISUAL_EXECUTOR] Using default fallback: {model} -> {type(agent).__name__ if agent else 'None'}")
+        return agent
     
     def _find_next_agent_block(self, current_block_id: str, 
                              connections: List[VisualConnection],
