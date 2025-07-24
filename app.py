@@ -1,7 +1,8 @@
 import asyncio
 import os
 import json
-from flask import Flask, request, jsonify, render_template
+import time
+from flask import Flask, request, jsonify, render_template, send_file
 from main_controller import MainController
 from tasks import Task
 from visual_flow_executor import VisualFlowExecutor, VisualBlock, VisualConnection
@@ -314,6 +315,56 @@ def validate_visual_flow():
             "validation": validation_result,
             "statistics": stats
         })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/download/<filename>')
+def download_file(filename):
+    """Download a file from the tmp directory."""
+    try:
+        # Security check - only allow .pptx files
+        if not filename.endswith('.pptx'):
+            return jsonify({"error": "Only PowerPoint files are allowed"}), 403
+        
+        file_path = os.path.join('/tmp', filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({"error": "File not found"}), 404
+        
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='application/vnd.openxmlformats-officedocument.presentationml.presentation'
+        )
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/list_files')
+def list_files():
+    """List all available PowerPoint files."""
+    try:
+        files = []
+        tmp_dir = '/tmp'
+        
+        for filename in os.listdir(tmp_dir):
+            if filename.endswith('.pptx'):
+                file_path = os.path.join(tmp_dir, filename)
+                file_stat = os.stat(file_path)
+                
+                files.append({
+                    'filename': filename,
+                    'size': file_stat.st_size,
+                    'created': time.strftime('%a %b %d %H:%M:%S %Y', time.localtime(file_stat.st_ctime)),
+                    'download_url': f'/download/{filename}'
+                })
+        
+        # Sort by creation time (newest first)
+        files.sort(key=lambda x: x['created'], reverse=True)
+        
+        return jsonify({"files": files})
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500
