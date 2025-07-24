@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Flow Designer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .designer-container {
+            display: flex;
+            height: 100vh;
+        }
+
+        /* Sidebar with block palette */
+        .sidebar {
+            width: 280px;
+            background: white;
+            border-right: 1px solid #e1e5e9;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 2px 0 4px rgba(0,0,0,0.1);
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid #e1e5e9;
+            background: #f8f9fa;
+        }
+
+        .sidebar-header h2 {
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .block-palette {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .block-category {
+            margin-bottom: 25px;
+        }
+
+        .block-category h3 {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .palette-block {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border: 1px solid #e1e5e9;
+            border-radius: 8px;
+            cursor: grab;
+            transition: all 0.2s ease;
+            user-select: none;
+        }
+
+        .palette-block:hover {
+            background: #e9ecef;
+            border-color: #007bff;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0,123,255,0.15);
+        }
+
+        .palette-block:active {
+            cursor: grabbing;
+        }
+
+        .block-icon {
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+        }
+
+        .block-icon.agent { background: #007bff; }
+        .block-icon.condition { background: #ffc107; color: #333; }
+        .block-icon.merge { background: #28a745; }
+        .block-icon.split { background: #dc3545; }
+        .block-icon.start { background: #6f42c1; }
+        .block-icon.end { background: #6c757d; }
+
+        .block-info {
+            flex: 1;
+        }
+
+        .block-title {
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .block-description {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+
+        /* Main canvas area */
+        .canvas-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .canvas-toolbar {
+            height: 60px;
+            background: white;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 15px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .toolbar-button {
+            padding: 8px 16px;
+            border: 1px solid #e1e5e9;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .toolbar-button:hover {
+            background: #f8f9fa;
+            border-color: #007bff;
+        }
+
+        .toolbar-button.primary {
+            background: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+
+        .toolbar-button.primary:hover {
+            background: #0056b3;
+        }
+
+        .canvas {
+            position: absolute;
+            top: 60px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle, #e1e5e9 1px, transparent 1px);
+            background-size: 20px 20px;
+            cursor: grab;
+        }
+
+        .canvas.dragging {
+            cursor: grabbing;
+        }
+
+        /* Flow blocks on canvas */
+        .flow-block {
+            position: absolute;
+            min-width: 180px;
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 12px;
+            cursor: move;
+            user-select: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: all 0.2s ease;
+        }
+
+        .flow-block:hover {
+            border-color: #007bff;
+            box-shadow: 0 4px 16px rgba(0,123,255,0.2);
+        }
+
+        .flow-block.selected {
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+        .flow-block.dragging {
+            z-index: 1000;
+            transform: rotate(2deg);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .block-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid #e1e5e9;
+            display: flex;
+            align-items: center;
+            background: #f8f9fa;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .block-header .block-icon {
+            margin-right: 10px;
+        }
+
+        .block-header .block-title {
+            flex: 1;
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .block-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .block-action {
+            width: 20px;
+            height: 20px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: background 0.2s ease;
+        }
+
+        .block-action:hover {
+            background: #e9ecef;
+        }
+
+        .block-action.delete:hover {
+            background: #dc3545;
+            color: white;
+        }
+
+        .block-body {
+            padding: 16px;
+        }
+
+        .block-field {
+            margin-bottom: 12px;
+        }
+
+        .block-field:last-child {
+            margin-bottom: 0;
+        }
+
+        .block-field label {
+            display: block;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+
+        .block-field input,
+        .block-field select,
+        .block-field textarea {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid #e1e5e9;
+            border-radius: 4px;
+            font-size: 13px;
+            background: white;
+        }
+
+        .block-field textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .block-field input:focus,
+        .block-field select:focus,
+        .block-field textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0,123,255,0.1);
+        }
+
+        /* Connection points */
+        .connection-point {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: #007bff;
+            border: 2px solid white;
+            border-radius: 50%;
+            cursor: crosshair;
+            z-index: 10;
+            transition: all 0.2s ease;
+        }
+
+        .connection-point:hover {
+            transform: scale(1.3);
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.3);
+        }
+
+        .connection-point.input {
+            left: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connection-point.output {
+            right: -6px;
+            top: 50%;
+            transform: translateY(-50%);
+        }
+
+        .connection-point.feedback {
+            background: #ffc107;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* SVG for connections */
+        .connections-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .connection-line {
+            fill: none;
+            stroke: #007bff;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+        }
+
+        .connection-line.feedback {
+            stroke: #ffc107;
+            stroke-dasharray: 5,5;
+            marker-end: url(#arrowhead-feedback);
+        }
+
+        .connection-line.temporary {
+            stroke: #6c757d;
+            stroke-dasharray: 3,3;
+        }
+
+        /* Properties panel */
+        .properties-panel {
+            width: 320px;
+            background: white;
+            border-left: 1px solid #e1e5e9;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -2px 0 4px rgba(0,0,0,0.1);
+        }
+
+        .properties-header {
+            padding: 20px;
+            border-bottom: 1px solid #e1e5e9;
+            background: #f8f9fa;
+        }
+
+        .properties-header h3 {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .properties-body {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .property-group {
+            margin-bottom: 25px;
+        }
+
+        .property-group h4 {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 12px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .property-field {
+            margin-bottom: 15px;
+        }
+
+        .property-field label {
+            display: block;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+
+        .property-field input,
+        .property-field select,
+        .property-field textarea {
+            width: 100%;
+            padding: 8px 10px;
+            border: 1px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .property-field textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .property-field input:focus,
+        .property-field select:focus,
+        .property-field textarea:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 3px rgba(0,123,255,0.1);
+        }
+
+        /* Responsive design */
+        @media (max-width: 1200px) {
+            .properties-panel {
+                width: 280px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 240px;
+            }
+            .properties-panel {
+                display: none;
+            }
+        }
+
+        /* Loading and empty states */
+        .empty-canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: #6c757d;
+        }
+
+        .empty-canvas h3 {
+            font-size: 18px;
+            margin-bottom: 10px;
+        }
+
+        .empty-canvas p {
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="designer-container">
+        <!-- Block Palette Sidebar -->
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Block Palette</h2>
+                <p style="font-size: 12px; color: #666; margin: 0;">Drag blocks to canvas</p>
+            </div>
+            
+            <div class="block-palette">
+                <div class="block-category">
+                    <h3>Flow Control</h3>
+                    <div class="palette-block" draggable="true" data-block-type="start">
+                        <div class="block-icon start">S</div>
+                        <div class="block-info">
+                            <div class="block-title">Start</div>
+                            <div class="block-description">Flow entry point</div>
+                        </div>
+                    </div>
+                    <div class="palette-block" draggable="true" data-block-type="end">
+                        <div class="block-icon end">E</div>
+                        <div class="block-info">
+                            <div class="block-title">End</div>
+                            <div class="block-description">Flow exit point</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="block-category">
+                    <h3>Agent Blocks</h3>
+                    <div class="palette-block" draggable="true" data-block-type="agent">
+                        <div class="block-icon agent">A</div>
+                        <div class="block-info">
+                            <div class="block-title">Agent</div>
+                            <div class="block-description">AI agent processor</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="block-category">
+                    <h3>Logic Blocks</h3>
+                    <div class="palette-block" draggable="true" data-block-type="condition">
+                        <div class="block-icon condition">?</div>
+                        <div class="block-info">
+                            <div class="block-title">Condition</div>
+                            <div class="block-description">Conditional branching</div>
+                        </div>
+                    </div>
+                    <div class="palette-block" draggable="true" data-block-type="merge">
+                        <div class="block-icon merge">M</div>
+                        <div class="block-info">
+                            <div class="block-title">Merge</div>
+                            <div class="block-description">Combine inputs</div>
+                        </div>
+                    </div>
+                    <div class="palette-block" draggable="true" data-block-type="split">
+                        <div class="block-icon split">S</div>
+                        <div class="block-info">
+                            <div class="block-title">Split</div>
+                            <div class="block-description">Split into branches</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="canvas-container">
+            <div class="canvas-toolbar">
+                <button class="toolbar-button" onclick="clearCanvas()">
+                    🗑️ Clear
+                </button>
+                <button class="toolbar-button" onclick="saveFlow()">
+                    💾 Save
+                </button>
+                <button class="toolbar-button" onclick="loadFlow()">
+                    📁 Load
+                </button>
+                <button class="toolbar-button primary" onclick="executeFlow()">
+                    ▶️ Execute
+                </button>
+                <div style="flex: 1;"></div>
+                <button class="toolbar-button" onclick="zoomIn()">🔍+</button>
+                <button class="toolbar-button" onclick="zoomOut()">🔍-</button>
+                <button class="toolbar-button" onclick="resetZoom()">🔍 Reset</button>
+            </div>
+
+            <div class="canvas" id="canvas">
+                <svg class="connections-svg" id="connectionsSvg">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#007bff" />
+                        </marker>
+                        <marker id="arrowhead-feedback" markerWidth="10" markerHeight="7" 
+                                refX="9" refY="3.5" orient="auto">
+                            <polygon points="0 0, 10 3.5, 0 7" fill="#ffc107" />
+                        </marker>
+                    </defs>
+                </svg>
+
+                <div class="empty-canvas" id="emptyState">
+                    <h3>Start Building Your Flow</h3>
+                    <p>Drag blocks from the palette to create your agent workflow.<br>
+                    Connect blocks with arrows to define the flow.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Properties Panel -->
+        <div class="properties-panel">
+            <div class="properties-header">
+                <h3 id="propertiesTitle">Properties</h3>
+                <p style="font-size: 12px; color: #666; margin: 0;">Select a block to edit</p>
+            </div>
+            
+            <div class="properties-body" id="propertiesBody">
+                <div style="text-align: center; color: #6c757d; padding: 40px 20px;">
+                    <p>Select a block on the canvas to view and edit its properties.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let canvas = document.getElementById('canvas');
+        let connectionsSvg = document.getElementById('connectionsSvg');
+        let selectedBlock = null;
+        let draggedBlock = null;
+        let isConnecting = false;
+        let connectionStart = null;
+        let connectionType = 'forward'; // 'forward' or 'feedback'
+        let blocks = new Map();
+        let connections = [];
+        let blockCounter = 0;
+        let canvasOffset = { x: 0, y: 0 };
+        let zoom = 1;
+
+        // Available models and agents
+        const availableModels = [
+            'gpt-4o',
+            'gpt-4o-mini', 
+            'claude-3-sonnet',
+            'claude-3-haiku',
+            'grok-beta',
+            'o3-mini'
+        ];
+
+        const availableAgents = [
+            'Developer',
+            'CodeVerifier', 
+            'Manager',
+            'OpenManus'
+        ];
+
+        // Initialize the designer
+        function initializeDesigner() {
+            setupDragAndDrop();
+            setupCanvasEvents();
+            setupConnectionEvents();
+            updateEmptyState();
+        }
+
+        // Setup drag and drop for palette blocks
+        function setupDragAndDrop() {
+            const paletteBlocks = document.querySelectorAll('.palette-block');
+            
+            paletteBlocks.forEach(block => {
+                block.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', block.dataset.blockType);
+                });
+            });
+
+            canvas.addEventListener('dragover', (e) => {
+                e.preventDefault();
+            });
+
+            canvas.addEventListener('drop', (e) => {
+                e.preventDefault();
+                const blockType = e.dataTransfer.getData('text/plain');
+                const rect = canvas.getBoundingClientRect();
+                const x = (e.clientX - rect.left - canvasOffset.x) / zoom;
+                const y = (e.clientY - rect.top - canvasOffset.y) / zoom;
+                
+                createBlock(blockType, x, y);
+            });
+        }
+
+        // Create a new block on the canvas
+        function createBlock(type, x, y) {
+            blockCounter++;
+            const blockId = `block_${blockCounter}`;
+            
+            const blockData = {
+                id: blockId,
+                type: type,
+                x: x,
+                y: y,
+                config: getDefaultConfig(type)
+            };
+
+            blocks.set(blockId, blockData);
+            renderBlock(blockData);
+            updateEmptyState();
+        }
+
+        // Get default configuration for block type
+        function getDefaultConfig(type) {
+            const configs = {
+                start: {
+                    title: 'Start',
+                    description: 'Flow entry point'
+                },
+                end: {
+                    title: 'End', 
+                    description: 'Flow exit point'
+                },
+                agent: {
+                    title: 'Agent Block',
+                    model: 'gpt-4o',
+                    agent: 'Developer',
+                    role: 'Assistant',
+                    task: 'Process the input and provide a response',
+                    temperature: 0.7,
+                    maxTokens: 1000
+                },
+                condition: {
+                    title: 'Condition',
+                    condition: 'input.length > 0',
+                    description: 'Conditional logic'
+                },
+                merge: {
+                    title: 'Merge',
+                    strategy: 'concatenate',
+                    description: 'Combine multiple inputs'
+                },
+                split: {
+                    title: 'Split',
+                    strategy: 'lines',
+                    description: 'Split input into parts'
+                }
+            };
+            
+            return configs[type] || {};
+        }
+
+        // Render a block on the canvas
+        function renderBlock(blockData) {
+            const blockElement = document.createElement('div');
+            blockElement.className = 'flow-block';
+            blockElement.id = blockData.id;
+            blockElement.style.left = blockData.x + 'px';
+            blockElement.style.top = blockData.y + 'px';
+            
+            blockElement.innerHTML = generateBlockHTML(blockData);
+            
+            // Add event listeners
+            blockElement.addEventListener('click', () => selectBlock(blockData.id));
+            blockElement.addEventListener('mousedown', startDrag);
+            
+            canvas.appendChild(blockElement);
+            
+            // Add connection points
+            addConnectionPoints(blockElement, blockData.type);
+        }
+
+        // Generate HTML for a block
+        function generateBlockHTML(blockData) {
+            const config = blockData.config;
+            const iconClass = blockData.type;
+            const iconText = blockData.type.charAt(0).toUpperCase();
+            
+            let bodyContent = '';
+            
+            if (blockData.type === 'agent') {
+                bodyContent = `
+                    <div class="block-field">
+                        <label>Model</label>
+                        <select onchange="updateBlockConfig('${blockData.id}', 'model', this.value)">
+                            ${availableModels.map(model => 
+                                `<option value="${model}" ${config.model === model ? 'selected' : ''}>${model}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="block-field">
+                        <label>Agent</label>
+                        <select onchange="updateBlockConfig('${blockData.id}', 'agent', this.value)">
+                            ${availableAgents.map(agent => 
+                                `<option value="${agent}" ${config.agent === agent ? 'selected' : ''}>${agent}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    <div class="block-field">
+                        <label>Role</label>
+                        <input type="text" value="${config.role || ''}" 
+                               onchange="updateBlockConfig('${blockData.id}', 'role', this.value)"
+                               placeholder="e.g., Code Reviewer">
+                    </div>
+                `;
+            } else if (blockData.type === 'condition') {
+                bodyContent = `
+                    <div class="block-field">
+                        <label>Condition</label>
+                        <input type="text" value="${config.condition || ''}"
+                               onchange="updateBlockConfig('${blockData.id}', 'condition', this.value)"
+                               placeholder="e.g., input.length > 100">
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="block-header">
+                    <div class="block-icon ${iconClass}">${iconText}</div>
+                    <div class="block-title">${config.title || blockData.type}</div>
+                    <div class="block-actions">
+                        <button class="block-action" onclick="editBlock('${blockData.id}')">✏️</button>
+                        <button class="block-action delete" onclick="deleteBlock('${blockData.id}')">🗑️</button>
+                    </div>
+                </div>
+                <div class="block-body">
+                    ${bodyContent}
+                </div>
+            `;
+        }
+
+        // Add connection points to a block
+        function addConnectionPoints(blockElement, blockType) {
+            // Input connection point (left side)
+            if (blockType !== 'start') {
+                const inputPoint = document.createElement('div');
+                inputPoint.className = 'connection-point input';
+                inputPoint.addEventListener('click', (e) => handleConnectionClick(e, 'input'));
+                blockElement.appendChild(inputPoint);
+            }
+            
+            // Output connection point (right side)
+            if (blockType !== 'end') {
+                const outputPoint = document.createElement('div');
+                outputPoint.className = 'connection-point output';
+                outputPoint.addEventListener('click', (e) => handleConnectionClick(e, 'output'));
+                blockElement.appendChild(outputPoint);
+            }
+            
+            // Feedback connection point (bottom)
+            if (blockType === 'agent') {
+                const feedbackPoint = document.createElement('div');
+                feedbackPoint.className = 'connection-point feedback';
+                feedbackPoint.addEventListener('click', (e) => handleConnectionClick(e, 'feedback'));
+                blockElement.appendChild(feedbackPoint);
+            }
+        }
+
+        // Handle connection point clicks
+        function handleConnectionClick(e, pointType) {
+            e.stopPropagation();
+            
+            const blockElement = e.target.closest('.flow-block');
+            const blockId = blockElement.id;
+            
+            if (!isConnecting) {
+                // Start connection
+                isConnecting = true;
+                connectionStart = { blockId, pointType };
+                connectionType = pointType === 'feedback' ? 'feedback' : 'forward';
+                
+                // Visual feedback
+                e.target.style.transform = 'scale(1.5)';
+                canvas.style.cursor = 'crosshair';
+            } else {
+                // Complete connection
+                const connectionEnd = { blockId, pointType };
+                
+                if (canConnect(connectionStart, connectionEnd)) {
+                    createConnection(connectionStart, connectionEnd, connectionType);
+                }
+                
+                // Reset connection state
+                resetConnectionState();
+            }
+        }
+
+        // Check if two points can be connected
+        function canConnect(start, end) {
+            // Can't connect to self
+            if (start.blockId === end.blockId) return false;
+            
+            // Forward connections: output -> input
+            if (connectionType === 'forward') {
+                return start.pointType === 'output' && end.pointType === 'input';
+            }
+            
+            // Feedback connections: feedback -> input
+            if (connectionType === 'feedback') {
+                return start.pointType === 'feedback' && end.pointType === 'input';
+            }
+            
+            return false;
+        }
+
+        // Create a connection between two blocks
+        function createConnection(start, end, type) {
+            const connection = {
+                id: `conn_${connections.length + 1}`,
+                from: start.blockId,
+                to: end.blockId,
+                type: type
+            };
+            
+            connections.push(connection);
+            renderConnection(connection);
+        }
+
+        // Render a connection line
+        function renderConnection(connection) {
+            const fromBlock = document.getElementById(connection.from);
+            const toBlock = document.getElementById(connection.to);
+            
+            if (!fromBlock || !toBlock) return;
+            
+            const fromRect = fromBlock.getBoundingClientRect();
+            const toRect = toBlock.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            // Calculate connection points
+            let startX, startY, endX, endY;
+            
+            if (connection.type === 'feedback') {
+                // From feedback point (bottom) to input point (left)
+                startX = fromRect.left + fromRect.width / 2 - canvasRect.left;
+                startY = fromRect.bottom - canvasRect.top;
+                endX = toRect.left - canvasRect.left;
+                endY = toRect.top + toRect.height / 2 - canvasRect.top;
+            } else {
+                // From output point (right) to input point (left)
+                startX = fromRect.right - canvasRect.left;
+                startY = fromRect.top + fromRect.height / 2 - canvasRect.top;
+                endX = toRect.left - canvasRect.left;
+                endY = toRect.top + toRect.height / 2 - canvasRect.top;
+            }
+            
+            // Create SVG path
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            const pathData = createCurvedPath(startX, startY, endX, endY);
+            
+            path.setAttribute('d', pathData);
+            path.setAttribute('class', `connection-line ${connection.type}`);
+            path.setAttribute('data-connection-id', connection.id);
+            
+            connectionsSvg.appendChild(path);
+        }
+
+        // Create a curved path between two points
+        function createCurvedPath(x1, y1, x2, y2) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            
+            // Control points for bezier curve
+            const cp1x = x1 + dx * 0.5;
+            const cp1y = y1;
+            const cp2x = x2 - dx * 0.5;
+            const cp2y = y2;
+            
+            return `M ${x1} ${y1} C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${x2} ${y2}`;
+        }
+
+        // Reset connection state
+        function resetConnectionState() {
+            isConnecting = false;
+            connectionStart = null;
+            canvas.style.cursor = 'grab';
+            
+            // Reset visual feedback on connection points
+            document.querySelectorAll('.connection-point').forEach(point => {
+                point.style.transform = '';
+            });
+        }
+
+        // Select a block
+        function selectBlock(blockId) {
+            // Remove previous selection
+            document.querySelectorAll('.flow-block.selected').forEach(block => {
+                block.classList.remove('selected');
+            });
+            
+            // Select new block
+            const blockElement = document.getElementById(blockId);
+            blockElement.classList.add('selected');
+            selectedBlock = blockId;
+            
+            // Update properties panel
+            updatePropertiesPanel(blockId);
+        }
+
+        // Update properties panel
+        function updatePropertiesPanel(blockId) {
+            const blockData = blocks.get(blockId);
+            if (!blockData) return;
+            
+            const title = document.getElementById('propertiesTitle');
+            const body = document.getElementById('propertiesBody');
+            
+            title.textContent = `${blockData.config.title || blockData.type} Properties`;
+            
+            body.innerHTML = generatePropertiesHTML(blockData);
+        }
+
+        // Generate properties panel HTML
+        function generatePropertiesHTML(blockData) {
+            const config = blockData.config;
+            let html = '';
+            
+            // Basic properties
+            html += `
+                <div class="property-group">
+                    <h4>Basic Properties</h4>
+                    <div class="property-field">
+                        <label>Title</label>
+                        <input type="text" value="${config.title || ''}" 
+                               onchange="updateBlockConfig('${blockData.id}', 'title', this.value)">
+                    </div>
+                    <div class="property-field">
+                        <label>Description</label>
+                        <textarea onchange="updateBlockConfig('${blockData.id}', 'description', this.value)">${config.description || ''}</textarea>
+                    </div>
+                </div>
+            `;
+            
+            // Type-specific properties
+            if (blockData.type === 'agent') {
+                html += `
+                    <div class="property-group">
+                        <h4>Agent Configuration</h4>
+                        <div class="property-field">
+                            <label>Model</label>
+                            <select onchange="updateBlockConfig('${blockData.id}', 'model', this.value)">
+                                ${availableModels.map(model => 
+                                    `<option value="${model}" ${config.model === model ? 'selected' : ''}>${model}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="property-field">
+                            <label>Agent Type</label>
+                            <select onchange="updateBlockConfig('${blockData.id}', 'agent', this.value)">
+                                ${availableAgents.map(agent => 
+                                    `<option value="${agent}" ${config.agent === agent ? 'selected' : ''}>${agent}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                        <div class="property-field">
+                            <label>Role</label>
+                            <input type="text" value="${config.role || ''}" 
+                                   onchange="updateBlockConfig('${blockData.id}', 'role', this.value)"
+                                   placeholder="e.g., Senior Developer, Code Reviewer">
+                        </div>
+                        <div class="property-field">
+                            <label>Task Description</label>
+                            <textarea onchange="updateBlockConfig('${blockData.id}', 'task', this.value)" 
+                                      placeholder="Describe what this agent should do...">${config.task || ''}</textarea>
+                        </div>
+                        <div class="property-field">
+                            <label>Temperature</label>
+                            <input type="number" min="0" max="2" step="0.1" value="${config.temperature || 0.7}" 
+                                   onchange="updateBlockConfig('${blockData.id}', 'temperature', parseFloat(this.value))">
+                        </div>
+                        <div class="property-field">
+                            <label>Max Tokens</label>
+                            <input type="number" min="1" max="4000" value="${config.maxTokens || 1000}" 
+                                   onchange="updateBlockConfig('${blockData.id}', 'maxTokens', parseInt(this.value))">
+                        </div>
+                    </div>
+                `;
+            } else if (blockData.type === 'condition') {
+                html += `
+                    <div class="property-group">
+                        <h4>Condition Logic</h4>
+                        <div class="property-field">
+                            <label>Condition Expression</label>
+                            <textarea onchange="updateBlockConfig('${blockData.id}', 'condition', this.value)" 
+                                      placeholder="e.g., input.length > 100">${config.condition || ''}</textarea>
+                        </div>
+                    </div>
+                `;
+            } else if (blockData.type === 'merge') {
+                html += `
+                    <div class="property-group">
+                        <h4>Merge Strategy</h4>
+                        <div class="property-field">
+                            <label>Strategy</label>
+                            <select onchange="updateBlockConfig('${blockData.id}', 'strategy', this.value)">
+                                <option value="concatenate" ${config.strategy === 'concatenate' ? 'selected' : ''}>Concatenate</option>
+                                <option value="json_merge" ${config.strategy === 'json_merge' ? 'selected' : ''}>JSON Merge</option>
+                                <option value="custom" ${config.strategy === 'custom' ? 'selected' : ''}>Custom</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            } else if (blockData.type === 'split') {
+                html += `
+                    <div class="property-group">
+                        <h4>Split Strategy</h4>
+                        <div class="property-field">
+                            <label>Strategy</label>
+                            <select onchange="updateBlockConfig('${blockData.id}', 'strategy', this.value)">
+                                <option value="lines" ${config.strategy === 'lines' ? 'selected' : ''}>By Lines</option>
+                                <option value="words" ${config.strategy === 'words' ? 'selected' : ''}>By Words</option>
+                                <option value="custom" ${config.strategy === 'custom' ? 'selected' : ''}>Custom</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return html;
+        }
+
+        // Update block configuration
+        function updateBlockConfig(blockId, key, value) {
+            const blockData = blocks.get(blockId);
+            if (!blockData) return;
+            
+            blockData.config[key] = value;
+            
+            // Re-render the block if title changed
+            if (key === 'title') {
+                const blockElement = document.getElementById(blockId);
+                blockElement.innerHTML = generateBlockHTML(blockData);
+                addConnectionPoints(blockElement, blockData.type);
+            }
+        }
+
+        // Delete a block
+        function deleteBlock(blockId) {
+            if (confirm('Are you sure you want to delete this block?')) {
+                // Remove from DOM
+                const blockElement = document.getElementById(blockId);
+                blockElement.remove();
+                
+                // Remove from data
+                blocks.delete(blockId);
+                
+                // Remove connections
+                connections = connections.filter(conn => {
+                    if (conn.from === blockId || conn.to === blockId) {
+                        // Remove connection line from SVG
+                        const line = connectionsSvg.querySelector(`[data-connection-id="${conn.id}"]`);
+                        if (line) line.remove();
+                        return false;
+                    }
+                    return true;
+                });
+                
+                // Clear selection if this block was selected
+                if (selectedBlock === blockId) {
+                    selectedBlock = null;
+                    updatePropertiesPanel(null);
+                }
+                
+                updateEmptyState();
+            }
+        }
+
+        // Setup canvas events
+        function setupCanvasEvents() {
+            let isDragging = false;
+            let lastX, lastY;
+            
+            canvas.addEventListener('mousedown', (e) => {
+                if (e.target === canvas) {
+                    isDragging = true;
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                    canvas.classList.add('dragging');
+                }
+            });
+            
+            canvas.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - lastX;
+                    const deltaY = e.clientY - lastY;
+                    
+                    canvasOffset.x += deltaX;
+                    canvasOffset.y += deltaY;
+                    
+                    updateCanvasTransform();
+                    
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                }
+            });
+            
+            canvas.addEventListener('mouseup', () => {
+                isDragging = false;
+                canvas.classList.remove('dragging');
+            });
+            
+            // Click to deselect
+            canvas.addEventListener('click', (e) => {
+                if (e.target === canvas) {
+                    selectedBlock = null;
+                    document.querySelectorAll('.flow-block.selected').forEach(block => {
+                        block.classList.remove('selected');
+                    });
+                    updatePropertiesPanel(null);
+                }
+            });
+        }
+
+        // Setup connection events
+        function setupConnectionEvents() {
+            // Cancel connection on escape
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && isConnecting) {
+                    resetConnectionState();
+                }
+            });
+        }
+
+        // Start dragging a block
+        function startDrag(e) {
+            if (e.target.closest('.connection-point')) return;
+            
+            const blockElement = e.currentTarget;
+            const blockId = blockElement.id;
+            
+            draggedBlock = blockId;
+            blockElement.classList.add('dragging');
+            
+            const rect = blockElement.getBoundingClientRect();
+            const canvasRect = canvas.getBoundingClientRect();
+            
+            const offsetX = e.clientX - rect.left;
+            const offsetY = e.clientY - rect.top;
+            
+            function onMouseMove(e) {
+                const x = (e.clientX - canvasRect.left - offsetX - canvasOffset.x) / zoom;
+                const y = (e.clientY - canvasRect.top - offsetY - canvasOffset.y) / zoom;
+                
+                blockElement.style.left = x + 'px';
+                blockElement.style.top = y + 'px';
+                
+                // Update block data
+                const blockData = blocks.get(blockId);
+                if (blockData) {
+                    blockData.x = x;
+                    blockData.y = y;
+                }
+                
+                // Update connections
+                updateConnections();
+            }
+            
+            function onMouseUp() {
+                blockElement.classList.remove('dragging');
+                draggedBlock = null;
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
+            
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
+
+        // Update all connections
+        function updateConnections() {
+            // Clear existing connections
+            connectionsSvg.querySelectorAll('.connection-line').forEach(line => line.remove());
+            
+            // Re-render all connections
+            connections.forEach(connection => {
+                renderConnection(connection);
+            });
+        }
+
+        // Update canvas transform
+        function updateCanvasTransform() {
+            const blocks = canvas.querySelectorAll('.flow-block');
+            blocks.forEach(block => {
+                // Blocks are positioned absolutely, so we don't need to transform them
+                // The canvas background will move with the offset
+            });
+            
+            // Update connections
+            updateConnections();
+        }
+
+        // Update empty state visibility
+        function updateEmptyState() {
+            const emptyState = document.getElementById('emptyState');
+            emptyState.style.display = blocks.size === 0 ? 'block' : 'none';
+        }
+
+        // Toolbar functions
+        function clearCanvas() {
+            if (confirm('Are you sure you want to clear the entire canvas?')) {
+                blocks.clear();
+                connections = [];
+                canvas.querySelectorAll('.flow-block').forEach(block => block.remove());
+                connectionsSvg.querySelectorAll('.connection-line').forEach(line => line.remove());
+                selectedBlock = null;
+                updatePropertiesPanel(null);
+                updateEmptyState();
+            }
+        }
+
+        function saveFlow() {
+            const flowData = {
+                blocks: Array.from(blocks.values()),
+                connections: connections,
+                metadata: {
+                    created: new Date().toISOString(),
+                    version: '1.0'
+                }
+            };
+            
+            const dataStr = JSON.stringify(flowData, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = 'agent_flow.json';
+            link.click();
+        }
+
+        function loadFlow() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const flowData = JSON.parse(e.target.result);
+                        
+                        // Clear current flow
+                        clearCanvas();
+                        
+                        // Load blocks
+                        flowData.blocks.forEach(blockData => {
+                            blocks.set(blockData.id, blockData);
+                            renderBlock(blockData);
+                        });
+                        
+                        // Load connections
+                        connections = flowData.connections || [];
+                        updateConnections();
+                        
+                        updateEmptyState();
+                        
+                    } catch (error) {
+                        alert('Error loading flow: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            };
+            
+            input.click();
+        }
+
+        function executeFlow() {
+            if (blocks.size === 0) {
+                alert('Please create a flow first');
+                return;
+            }
+            
+            // Get task content from user
+            const content = prompt('Enter the task content for this flow:');
+            if (!content) return;
+            
+            // Convert flow to backend format
+            const flowData = {
+                blocks: Array.from(blocks.values()),
+                connections: connections.map(conn => ({
+                    id: conn.id,
+                    from: conn.from,
+                    to: conn.to,
+                    type: conn.type
+                })),
+                content: content,
+                type: 'visual_flow'
+            };
+            
+            // Validate flow first
+            fetch('/validate_visual_flow', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(flowData)
+            })
+            .then(response => response.json())
+            .then(validation => {
+                if (!validation.validation.valid) {
+                    const errors = validation.validation.errors.join('\n');
+                    alert('Flow validation failed:\n' + errors);
+                    return;
+                }
+                
+                if (validation.validation.warnings.length > 0) {
+                    const warnings = validation.validation.warnings.join('\n');
+                    if (!confirm('Flow has warnings:\n' + warnings + '\n\nContinue execution?')) {
+                        return;
+                    }
+                }
+                
+                // Execute the flow
+                return fetch('/execute_visual_flow', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(flowData)
+                });
+            })
+            .then(response => {
+                if (!response) return; // User cancelled
+                return response.json();
+            })
+            .then(result => {
+                if (!result) return; // User cancelled
+                
+                if (result.error) {
+                    alert('Execution error: ' + result.error);
+                } else {
+                    // Show results in a new window
+                    const resultWindow = window.open('', 'flowResult', 'width=800,height=600,scrollbars=yes');
+                    resultWindow.document.write(`
+                        <html>
+                        <head><title>Flow Execution Result</title></head>
+                        <body style="font-family: Arial, sans-serif; padding: 20px;">
+                            <h1>Flow Execution Result</h1>
+                            <h2>Status: ${result.status}</h2>
+                            <h3>Statistics:</h3>
+                            <p>Blocks: ${result.result.visual_flow.blocks}</p>
+                            <p>Connections: ${result.result.visual_flow.connections}</p>
+                            <p>Chain ID: ${result.result.visual_flow.chain_id}</p>
+                            <h3>Execution History:</h3>
+                            <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto;">
+${JSON.stringify(result.result.history, null, 2)}
+                            </pre>
+                            <h3>Final Results:</h3>
+                            <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto;">
+${JSON.stringify(result.result.final_result, null, 2)}
+                            </pre>
+                        </body>
+                        </html>
+                    `);
+                }
+            })
+            .catch(error => {
+                alert('Error executing flow: ' + error.message);
+            });
+        }
+
+        function zoomIn() {
+            zoom = Math.min(zoom * 1.2, 3);
+            updateZoom();
+        }
+
+        function zoomOut() {
+            zoom = Math.max(zoom / 1.2, 0.3);
+            updateZoom();
+        }
+
+        function resetZoom() {
+            zoom = 1;
+            canvasOffset = { x: 0, y: 0 };
+            updateZoom();
+        }
+
+        function updateZoom() {
+            canvas.style.transform = `scale(${zoom}) translate(${canvasOffset.x}px, ${canvasOffset.y}px)`;
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initializeDesigner);
+    </script>
+</body>
+</html>
+

@@ -174,6 +174,7 @@
             <button class="tab active" onclick="showTab('simple')">Simple Task</button>
             <button class="tab" onclick="showTab('chains')">Chain Execution</button>
             <button class="tab" onclick="showTab('builder')">Chain Builder</button>
+            <button class="tab" onclick="showTab('visual')">Visual Flow Designer</button>
             <button class="tab" onclick="showTab('status')">System Status</button>
         </div>
 
@@ -231,6 +232,52 @@
             </div>
             
             <button onclick="executeChain()">Execute Chain</button>
+        </div>
+
+        <!-- Visual Flow Designer Tab -->
+        <div id="visual" class="tab-content">
+            <h2>Visual Flow Designer</h2>
+            <p style="margin-bottom: 20px;">Design your agent workflows visually with drag-and-drop blocks and arrow connections.</p>
+            
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button onclick="openFlowDesigner()" class="toolbar-button primary" style="padding: 15px 30px; font-size: 16px;">
+                    🎨 Open Visual Designer
+                </button>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                <h3 style="margin-top: 0;">Features:</h3>
+                <ul style="margin: 10px 0; padding-left: 20px;">
+                    <li><strong>Drag & Drop:</strong> Drag blocks from the palette to create your workflow</li>
+                    <li><strong>Visual Connections:</strong> Connect blocks with arrows for forward flow and feedback loops</li>
+                    <li><strong>Block Customization:</strong> Configure each block with specific models, roles, and tasks</li>
+                    <li><strong>Real-time Properties:</strong> Edit block properties in the side panel</li>
+                    <li><strong>Save & Load:</strong> Save your flows as JSON files and load them later</li>
+                    <li><strong>Flow Execution:</strong> Execute your visual flows directly</li>
+                </ul>
+            </div>
+            
+            <div style="background: #e7f3ff; padding: 15px; border-radius: 8px; border-left: 4px solid #007bff;">
+                <h4 style="margin-top: 0; color: #007bff;">Available Block Types:</h4>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 10px;">
+                    <div>
+                        <strong>🚀 Start/End:</strong><br>
+                        <small>Flow entry and exit points</small>
+                    </div>
+                    <div>
+                        <strong>🤖 Agent:</strong><br>
+                        <small>AI agent processors with custom models</small>
+                    </div>
+                    <div>
+                        <strong>❓ Condition:</strong><br>
+                        <small>Conditional branching logic</small>
+                    </div>
+                    <div>
+                        <strong>🔀 Merge/Split:</strong><br>
+                        <small>Combine or split data flows</small>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Chain Builder Tab -->
@@ -635,6 +682,16 @@
             }
             
             responseDiv.style.display = 'block';
+        }
+
+        // Open flow designer in new window
+        function openFlowDesigner() {
+            const designerWindow = window.open('/flow_designer', 'flowDesigner', 
+                'width=1400,height=900,scrollbars=yes,resizable=yes');
+            
+            if (!designerWindow) {
+                alert('Please allow popups to open the Visual Flow Designer');
+            }
         }
 
         // Load initial status

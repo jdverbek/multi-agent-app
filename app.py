@@ -4,6 +4,7 @@ import json
 from flask import Flask, request, jsonify, render_template
 from main_controller import MainController
 from tasks import Task
+from visual_flow_executor import VisualFlowExecutor, VisualBlock, VisualConnection
 
 app = Flask(__name__)
 
@@ -20,12 +21,20 @@ def get_controller():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         controller_task = loop.create_task(controller.run())
+        
+        # Initialize visual flow executor
+        controller.visual_executor = VisualFlowExecutor(controller.agents)
     return controller
 
 @app.route('/')
 def home():
     """Serve the web interface."""
     return render_template('index.html')
+
+@app.route('/flow_designer')
+def flow_designer():
+    """Serve the visual flow designer."""
+    return render_template('flow_designer.html')
 
 @app.route('/status')
 def status():
@@ -189,6 +198,121 @@ def execute_chain():
             "status": "executed",
             "chain_id": chain_id,
             "result": result
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/execute_visual_flow', methods=['POST'])
+def execute_visual_flow():
+    """Execute a visual flow."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        # Parse visual flow data
+        blocks_data = data.get('blocks', [])
+        connections_data = data.get('connections', [])
+        task_content = data.get('content', '')
+        task_type = data.get('type', 'general')
+        
+        if not blocks_data or not task_content:
+            return jsonify({"error": "blocks and content are required"}), 400
+        
+        # Convert to visual flow objects
+        visual_blocks = [
+            VisualBlock(
+                id=block['id'],
+                type=block['type'],
+                x=block['x'],
+                y=block['y'],
+                config=block['config']
+            )
+            for block in blocks_data
+        ]
+        
+        visual_connections = [
+            VisualConnection(
+                id=conn['id'],
+                from_block=conn['from'],
+                to_block=conn['to'],
+                type=conn['type']
+            )
+            for conn in connections_data
+        ]
+        
+        # Create task
+        task = Task(type=task_type, content=task_content)
+        
+        controller = get_controller()
+        
+        # Execute visual flow
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            controller.visual_executor.execute_visual_flow(
+                visual_blocks, visual_connections, task
+            )
+        )
+        
+        return jsonify({
+            "status": "executed",
+            "result": result
+        })
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/validate_visual_flow', methods=['POST'])
+def validate_visual_flow():
+    """Validate a visual flow."""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No JSON data provided"}), 400
+        
+        # Parse visual flow data
+        blocks_data = data.get('blocks', [])
+        connections_data = data.get('connections', [])
+        
+        # Convert to visual flow objects
+        visual_blocks = [
+            VisualBlock(
+                id=block['id'],
+                type=block['type'],
+                x=block['x'],
+                y=block['y'],
+                config=block['config']
+            )
+            for block in blocks_data
+        ]
+        
+        visual_connections = [
+            VisualConnection(
+                id=conn['id'],
+                from_block=conn['from'],
+                to_block=conn['to'],
+                type=conn['type']
+            )
+            for conn in connections_data
+        ]
+        
+        controller = get_controller()
+        
+        # Validate flow
+        validation_result = controller.visual_executor.validate_visual_flow(
+            visual_blocks, visual_connections
+        )
+        
+        # Get statistics
+        stats = controller.visual_executor.get_flow_statistics(
+            visual_blocks, visual_connections
+        )
+        
+        return jsonify({
+            "validation": validation_result,
+            "statistics": stats
         })
         
     except Exception as e:
