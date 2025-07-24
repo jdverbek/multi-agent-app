@@ -492,6 +492,24 @@
             
             <div class="block-palette">
                 <div class="block-category">
+                    <h3>Workflow Templates</h3>
+                    <div class="palette-block" onclick="loadManagerWorkerTemplate()" style="cursor: pointer; border: 2px dashed #007bff;">
+                        <div class="block-icon" style="background: #007bff;">📋</div>
+                        <div class="block-info">
+                            <div class="block-title">Manager-Worker Loop</div>
+                            <div class="block-description">Quality control workflow</div>
+                        </div>
+                    </div>
+                    <div class="palette-block" onclick="loadPowerPointTemplate()" style="cursor: pointer; border: 2px dashed #28a745;">
+                        <div class="block-icon" style="background: #28a745;">📊</div>
+                        <div class="block-info">
+                            <div class="block-title">PowerPoint Creation</div>
+                            <div class="block-description">Presentation workflow</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="block-category">
                     <h3>Flow Control</h3>
                     <div class="palette-block" draggable="true" data-block-type="start">
                         <div class="block-icon start">S</div>
@@ -1367,6 +1385,12 @@
                 type: 'visual_flow'
             };
             
+            // Show loading indicator
+            const executeButton = document.querySelector('.toolbar-button.primary');
+            const originalText = executeButton.innerHTML;
+            executeButton.innerHTML = '⏳ Executing...';
+            executeButton.disabled = true;
+            
             // Validate flow first
             fetch('/validate_visual_flow', {
                 method: 'POST',
@@ -1381,11 +1405,26 @@
                     return;
                 }
                 
+                // Show validation info including manager-worker patterns
+                let validationMessage = '';
+                if (validation.validation.quality_gates_detected > 0) {
+                    validationMessage += `✅ Manager-Worker Quality Control Detected!\n`;
+                    validationMessage += `Found ${validation.validation.quality_gates_detected} quality gate(s):\n`;
+                    validation.validation.manager_worker_patterns.forEach((pattern, index) => {
+                        validationMessage += `  ${index + 1}. Manager: ${pattern.manager} → Worker: ${pattern.worker} (max ${pattern.max_iterations} iterations)\n`;
+                    });
+                    validationMessage += '\n';
+                }
+                
                 if (validation.validation.warnings.length > 0) {
                     const warnings = validation.validation.warnings.join('\n');
-                    if (!confirm('Flow has warnings:\n' + warnings + '\n\nContinue execution?')) {
-                        return;
-                    }
+                    validationMessage += 'Warnings:\n' + warnings + '\n\n';
+                }
+                
+                validationMessage += 'Continue with execution?';
+                
+                if (validationMessage && !confirm(validationMessage)) {
+                    return;
                 }
                 
                 // Execute the flow
@@ -1405,34 +1444,182 @@
                 if (result.error) {
                     alert('Execution error: ' + result.error);
                 } else {
-                    // Show results in a new window
-                    const resultWindow = window.open('', 'flowResult', 'width=800,height=600,scrollbars=yes');
-                    resultWindow.document.write(`
-                        <html>
-                        <head><title>Flow Execution Result</title></head>
-                        <body style="font-family: Arial, sans-serif; padding: 20px;">
-                            <h1>Flow Execution Result</h1>
-                            <h2>Status: ${result.status}</h2>
-                            <h3>Statistics:</h3>
-                            <p>Blocks: ${result.result.visual_flow.blocks}</p>
-                            <p>Connections: ${result.result.visual_flow.connections}</p>
-                            <p>Chain ID: ${result.result.visual_flow.chain_id}</p>
-                            <h3>Execution History:</h3>
-                            <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto;">
-${JSON.stringify(result.result.history, null, 2)}
-                            </pre>
-                            <h3>Final Results:</h3>
-                            <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto;">
-${JSON.stringify(result.result.final_result, null, 2)}
-                            </pre>
-                        </body>
-                        </html>
-                    `);
+                    // Show enhanced results in a new window
+                    showExecutionResults(result, content);
                 }
             })
             .catch(error => {
                 alert('Error executing flow: ' + error.message);
+            })
+            .finally(() => {
+                // Reset button
+                executeButton.innerHTML = originalText;
+                executeButton.disabled = false;
             });
+        }
+        
+        function showExecutionResults(result, originalContent) {
+            const resultWindow = window.open('', 'flowResult', 'width=1000,height=700,scrollbars=yes');
+            
+            let htmlContent = `
+                <html>
+                <head>
+                    <title>Visual Flow Execution Results</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; line-height: 1.6; }
+                        .header { background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+                        .section { margin-bottom: 25px; }
+                        .section h3 { color: #007bff; border-bottom: 2px solid #007bff; padding-bottom: 5px; }
+                        .success { color: #28a745; font-weight: bold; }
+                        .warning { color: #ffc107; font-weight: bold; }
+                        .error { color: #dc3545; font-weight: bold; }
+                        .iteration { background: #f8f9fa; padding: 15px; margin: 10px 0; border-left: 4px solid #007bff; border-radius: 4px; }
+                        .feedback { background: #fff3cd; padding: 10px; margin: 5px 0; border-radius: 4px; border: 1px solid #ffeaa7; }
+                        .result-box { background: #e7f3ff; padding: 15px; border-radius: 8px; margin: 10px 0; }
+                        .code { background: #f5f5f5; padding: 15px; border-radius: 5px; overflow: auto; font-family: monospace; white-space: pre-wrap; }
+                        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }
+                        .stat-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #e1e5e9; text-align: center; }
+                        .stat-number { font-size: 24px; font-weight: bold; color: #007bff; }
+                        .quality-gate { background: #d4edda; padding: 15px; border-radius: 8px; border: 1px solid #c3e6cb; margin: 10px 0; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🎯 Visual Flow Execution Results</h1>
+                        <p><strong>Original Request:</strong> ${originalContent}</p>
+                        <p><strong>Execution Type:</strong> ${result.result.visual_flow?.execution_type || 'Standard'}</p>
+                        <p><strong>Status:</strong> <span class="success">${result.status}</span></p>
+                    </div>
+            `;
+            
+            // Show execution statistics
+            if (result.result.visual_flow) {
+                htmlContent += `
+                    <div class="section">
+                        <h3>📊 Execution Statistics</h3>
+                        <div class="stats">
+                            <div class="stat-card">
+                                <div class="stat-number">${result.result.visual_flow.blocks}</div>
+                                <div>Blocks Processed</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number">${result.result.visual_flow.connections}</div>
+                                <div>Connections</div>
+                            </div>
+                `;
+                
+                if (result.result.quality_gates !== undefined) {
+                    htmlContent += `
+                            <div class="stat-card">
+                                <div class="stat-number">${result.result.quality_gates}</div>
+                                <div>Quality Gates</div>
+                            </div>
+                    `;
+                }
+                
+                htmlContent += `
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show manager-worker execution details
+            if (result.result.execution_history) {
+                htmlContent += `
+                    <div class="section">
+                        <h3>🔄 Execution History</h3>
+                `;
+                
+                result.result.execution_history.forEach((step, index) => {
+                    if (step.type === 'manager_worker_loop') {
+                        htmlContent += `
+                            <div class="quality-gate">
+                                <h4>🎯 Quality Control Loop - Block: ${step.block_id}</h4>
+                                <p><strong>Iterations:</strong> ${step.iterations}</p>
+                                <p><strong>Quality Approved:</strong> <span class="${step.quality_approved ? 'success' : 'warning'}">${step.quality_approved ? 'YES' : 'NO'}</span></p>
+                                <p><strong>Feedback Rounds:</strong> ${step.feedback_count}</p>
+                            </div>
+                        `;
+                    } else {
+                        htmlContent += `
+                            <div class="iteration">
+                                <h4>📝 Standard Processing - Block: ${step.block_id}</h4>
+                                <p><strong>Type:</strong> ${step.type}</p>
+                            </div>
+                        `;
+                    }
+                });
+                
+                htmlContent += `</div>`;
+            }
+            
+            // Show detailed results
+            if (result.result.final_result) {
+                htmlContent += `
+                    <div class="section">
+                        <h3>📋 Detailed Results</h3>
+                `;
+                
+                Object.entries(result.result.final_result).forEach(([blockId, blockResult]) => {
+                    htmlContent += `
+                        <div class="result-box">
+                            <h4>Block: ${blockId}</h4>
+                    `;
+                    
+                    if (blockResult.final_result) {
+                        // Manager-worker loop result
+                        htmlContent += `
+                            <p><strong>Status:</strong> <span class="${blockResult.quality_approved ? 'success' : 'warning'}">${blockResult.status}</span></p>
+                            <p><strong>Iterations:</strong> ${blockResult.iterations}/${blockResult.max_iterations}</p>
+                            
+                            <h5>📝 Manager Delegation:</h5>
+                            <div class="code">${JSON.stringify(blockResult.delegation_instructions, null, 2)}</div>
+                            
+                            <h5>🎯 Final Work Result:</h5>
+                            <div class="code">${JSON.stringify(blockResult.final_result, null, 2)}</div>
+                        `;
+                        
+                        if (blockResult.feedback_history && blockResult.feedback_history.length > 0) {
+                            htmlContent += `
+                                <h5>💬 Feedback History:</h5>
+                            `;
+                            blockResult.feedback_history.forEach((feedback, index) => {
+                                htmlContent += `
+                                    <div class="feedback">
+                                        <strong>Iteration ${index + 1} Feedback:</strong><br>
+                                        ${feedback}
+                                    </div>
+                                `;
+                            });
+                        }
+                    } else {
+                        // Standard result
+                        htmlContent += `
+                            <div class="code">${JSON.stringify(blockResult, null, 2)}</div>
+                        `;
+                    }
+                    
+                    htmlContent += `</div>`;
+                });
+                
+                htmlContent += `</div>`;
+            }
+            
+            // Show raw execution data
+            htmlContent += `
+                <div class="section">
+                    <h3>🔧 Raw Execution Data</h3>
+                    <details>
+                        <summary>Click to expand raw data</summary>
+                        <div class="code">${JSON.stringify(result.result, null, 2)}</div>
+                    </details>
+                </div>
+                
+                </body>
+                </html>
+            `;
+            
+            resultWindow.document.write(htmlContent);
         }
 
         function zoomIn() {
@@ -1453,6 +1640,214 @@ ${JSON.stringify(result.result.final_result, null, 2)}
 
         function updateZoom() {
             canvas.style.transform = `scale(${zoom}) translate(${canvasOffset.x}px, ${canvasOffset.y}px)`;
+        }
+
+        // Load manager-worker template
+        function loadManagerWorkerTemplate() {
+            if (blocks.size > 0 && !confirm('This will clear the current canvas. Continue?')) {
+                return;
+            }
+            
+            clearCanvas();
+            
+            // Create start block
+            const startBlock = {
+                id: 'start_1',
+                type: 'start',
+                x: 100,
+                y: 200,
+                config: {
+                    title: 'Start',
+                    description: 'Flow entry point'
+                }
+            };
+            
+            // Create manager block
+            const managerBlock = {
+                id: 'manager_1',
+                type: 'agent',
+                x: 300,
+                y: 200,
+                config: {
+                    title: 'Manager',
+                    model: 'gpt-4o',
+                    agent: 'Manager',
+                    role: 'Supervisor',
+                    task: 'Analyze the request, provide clear instructions to the worker, and review their work for quality control. Approve work that meets standards or provide specific feedback for improvement.',
+                    temperature: 0.3,
+                    maxTokens: 1000
+                }
+            };
+            
+            // Create worker block
+            const workerBlock = {
+                id: 'worker_1',
+                type: 'agent',
+                x: 500,
+                y: 200,
+                config: {
+                    title: 'Worker',
+                    model: 'gpt-4o',
+                    agent: 'OpenManus',
+                    role: 'Worker',
+                    task: 'Execute the task according to manager instructions. Incorporate feedback from previous iterations to improve the work.',
+                    temperature: 0.7,
+                    maxTokens: 1500
+                }
+            };
+            
+            // Create end block
+            const endBlock = {
+                id: 'end_1',
+                type: 'end',
+                x: 700,
+                y: 200,
+                config: {
+                    title: 'End',
+                    description: 'Flow exit point'
+                }
+            };
+            
+            // Add blocks to map
+            blocks.set(startBlock.id, startBlock);
+            blocks.set(managerBlock.id, managerBlock);
+            blocks.set(workerBlock.id, workerBlock);
+            blocks.set(endBlock.id, endBlock);
+            
+            // Render blocks
+            renderBlock(startBlock);
+            renderBlock(managerBlock);
+            renderBlock(workerBlock);
+            renderBlock(endBlock);
+            
+            // Create connections
+            const forwardConnections = [
+                { id: 'conn_1', from: 'start_1', to: 'manager_1', type: 'forward' },
+                { id: 'conn_2', from: 'manager_1', to: 'worker_1', type: 'forward' },
+                { id: 'conn_3', from: 'worker_1', to: 'end_1', type: 'forward' }
+            ];
+            
+            const feedbackConnection = {
+                id: 'conn_4',
+                from: 'manager_1',
+                to: 'worker_1',
+                type: 'feedback'
+            };
+            
+            // Add connections
+            connections.push(...forwardConnections, feedbackConnection);
+            
+            // Render connections
+            setTimeout(() => {
+                updateConnections();
+                updateEmptyState();
+            }, 100);
+            
+            alert('Manager-Worker Quality Control template loaded!\n\nThis template includes:\n• Manager for task delegation and quality review\n• Worker for task execution\n• Feedback loop for quality control\n• Maximum 3 iterations to avoid endless loops');
+        }
+        
+        // Load PowerPoint creation template
+        function loadPowerPointTemplate() {
+            if (blocks.size > 0 && !confirm('This will clear the current canvas. Continue?')) {
+                return;
+            }
+            
+            clearCanvas();
+            
+            // Create start block
+            const startBlock = {
+                id: 'start_1',
+                type: 'start',
+                x: 100,
+                y: 200,
+                config: {
+                    title: 'Start',
+                    description: 'PowerPoint request entry'
+                }
+            };
+            
+            // Create presentation manager
+            const managerBlock = {
+                id: 'manager_1',
+                type: 'agent',
+                x: 300,
+                y: 200,
+                config: {
+                    title: 'Presentation Manager',
+                    model: 'gpt-4o',
+                    agent: 'Manager',
+                    role: 'Presentation Supervisor',
+                    task: 'Analyze the PowerPoint request, break it down into clear requirements (structure, content, design), delegate to the presentation creator, and review the final presentation for quality, completeness, and professional standards.',
+                    temperature: 0.2,
+                    maxTokens: 1200
+                }
+            };
+            
+            // Create presentation creator
+            const workerBlock = {
+                id: 'worker_1',
+                type: 'agent',
+                x: 500,
+                y: 200,
+                config: {
+                    title: 'Presentation Creator',
+                    model: 'gpt-4o',
+                    agent: 'OpenManus',
+                    role: 'PowerPoint Developer',
+                    task: 'Create a professional PowerPoint presentation based on manager requirements. Include slide structure, content for each slide, design recommendations, and ensure the presentation meets professional standards. Incorporate manager feedback to improve the presentation.',
+                    temperature: 0.6,
+                    maxTokens: 2000
+                }
+            };
+            
+            // Create end block
+            const endBlock = {
+                id: 'end_1',
+                type: 'end',
+                x: 700,
+                y: 200,
+                config: {
+                    title: 'End',
+                    description: 'Completed presentation'
+                }
+            };
+            
+            // Add blocks to map
+            blocks.set(startBlock.id, startBlock);
+            blocks.set(managerBlock.id, managerBlock);
+            blocks.set(workerBlock.id, workerBlock);
+            blocks.set(endBlock.id, endBlock);
+            
+            // Render blocks
+            renderBlock(startBlock);
+            renderBlock(managerBlock);
+            renderBlock(workerBlock);
+            renderBlock(endBlock);
+            
+            // Create connections
+            const forwardConnections = [
+                { id: 'conn_1', from: 'start_1', to: 'manager_1', type: 'forward' },
+                { id: 'conn_2', from: 'manager_1', to: 'worker_1', type: 'forward' },
+                { id: 'conn_3', from: 'worker_1', to: 'end_1', type: 'forward' }
+            ];
+            
+            const feedbackConnection = {
+                id: 'conn_4',
+                from: 'manager_1',
+                to: 'worker_1',
+                type: 'feedback'
+            };
+            
+            // Add connections
+            connections.push(...forwardConnections, feedbackConnection);
+            
+            // Render connections
+            setTimeout(() => {
+                updateConnections();
+                updateEmptyState();
+            }, 100);
+            
+            alert('PowerPoint Creation template loaded!\n\nThis template includes:\n• Presentation Manager for requirements analysis\n• Presentation Creator for PowerPoint development\n• Quality control feedback loop\n• Optimized for professional presentation creation');
         }
 
         // Initialize when page loads
