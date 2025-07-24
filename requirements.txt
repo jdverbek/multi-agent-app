@@ -1,6 +1,8 @@
-requests>=2.31.0
-flask>=2.3.0
-gunicorn>=21.2.0
-openai>=1.3.0
-groq>=0.4.1
+flask
+gunicorn
+openai
+groq
+requests
+asyncio
+python-pptx
 
