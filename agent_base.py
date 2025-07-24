@@ -1,5 +1,5 @@
 import abc
-from .tasks import Task
+from tasks import Task
 
 class Agent(abc.ABC):
     """Base class for agents calling external LLM APIs."""
