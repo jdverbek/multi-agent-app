@@ -116,25 +116,27 @@ class AgentOpenManus(Agent):
             # Extract text content and color from the task
             content = task.content.lower()
             
-            # Extract text to display
+            # Extract text to display - look for specific text requests
             text_content = "Hello World"  # Default
-            if "tekst" in content:
+            if "llm" in content:
+                text_content = "llm"
+            elif "tekst" in content:
                 text_content = "tekst"
             elif "test" in content:
                 text_content = "test"
             elif "hello world" in content:
                 text_content = "Hello World"
             
-            # Extract color
+            # Extract color - support multiple languages and color names
             color_rgb = (255, 0, 0)  # Default red
-            if "rood" in content or "red" in content:
-                color_rgb = (255, 0, 0)
+            if "yellow" in content or "geel" in content:
+                color_rgb = (255, 255, 0)  # Yellow
+            elif "rood" in content or "red" in content:
+                color_rgb = (255, 0, 0)  # Red
             elif "blauw" in content or "blue" in content:
-                color_rgb = (0, 0, 255)
+                color_rgb = (0, 0, 255)  # Blue
             elif "groen" in content or "green" in content:
-                color_rgb = (0, 255, 0)
-            elif "geel" in content or "yellow" in content:
-                color_rgb = (255, 255, 0)
+                color_rgb = (0, 255, 0)  # Green
             
             # Generate timestamp for unique filename
             timestamp = int(time.time())
@@ -193,24 +195,24 @@ try:
     # Verify file was created
     if os.path.exists(filepath):
         file_size = os.path.getsize(filepath)
-        print(f"PowerPoint presentation created successfully!")
-        print(f"Filename: {filename}")
-        print(f"Full path: {filepath}")
-        print(f"Content: '{text_content}' in specified color")
-        print(f"Formatting: Bold, 48pt Arial font, centered")
-        print(f"File size: {{file_size}} bytes")
-        print(f"Download URL: https://jdverbek.onrender.com/download/{filename}")
-        print(f"PowerPoint creation task completed")
+        print("PowerPoint presentation created successfully!")
+        print("Filename: {filename}")
+        print("Full path: " + filepath)
+        print("Content: '{text_content}' in specified color")
+        print("Formatting: Bold, 48pt Arial font, centered")
+        print("File size: " + str(file_size) + " bytes")
+        print("Download URL: https://jdverbek.onrender.com/download/{filename}")
+        print("PowerPoint creation task completed")
     else:
         print("Error: PowerPoint file was not created")
         
 except Exception as e:
-    print(f"Error creating PowerPoint: {{e}}")
+    print("Error creating PowerPoint: " + str(e))
     # Create a simple text file as fallback
     try:
         with open("/tmp/{filename.replace('.pptx', '.txt')}", "w") as f:
-            f.write(f"PowerPoint creation failed. Content: {text_content}")
-        print(f"Created fallback text file: {filename.replace('.pptx', '.txt')}")
+            f.write("PowerPoint creation failed. Content: {text_content}")
+        print("Created fallback text file: {filename.replace('.pptx', '.txt')}")
     except:
         print("Failed to create fallback file")
 '''
