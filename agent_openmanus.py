@@ -154,9 +154,8 @@ class AgentOpenManus(Agent):
     file operations, and browser automation, rather than just providing instructions.
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
-        super().__init__(config)
-        self.name = "OpenManus"
+    def __init__(self, name: str, config: Optional[Dict[str, Any]] = None):
+        super().__init__(name)
         self.description = "A versatile general-purpose agent with support for both local and remote tools"
         
         # Initialize tool collection
