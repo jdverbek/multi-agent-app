@@ -6,8 +6,13 @@ from flask import Flask, request, jsonify, render_template, send_file
 from main_controller import MainController
 from tasks import Task
 from visual_flow_executor import VisualFlowExecutor, VisualBlock, VisualConnection
+from background_tasks import task_manager
 
 app = Flask(__name__)
+
+# Configure Flask for longer timeouts
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+app.config['PERMANENT_SESSION_LIFETIME'] = 1800  # 30 minutes
 
 # Global controller instance
 controller = None
@@ -206,7 +211,7 @@ def execute_chain():
 
 @app.route('/execute_visual_flow', methods=['POST'])
 def execute_visual_flow():
-    """Execute a visual flow."""
+    """Start a visual flow execution in the background."""
     try:
         data = request.get_json()
         if not data:
@@ -248,19 +253,74 @@ def execute_visual_flow():
         
         controller = get_controller()
         
-        # Execute visual flow
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            controller.visual_executor.execute_visual_flow(
-                visual_blocks, visual_connections, task
+        # Check if this is a simple task (< 5 blocks) for immediate execution
+        if len(visual_blocks) <= 4:
+            # Execute immediately for simple tasks
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                result = loop.run_until_complete(
+                    controller.visual_executor.execute_visual_flow(
+                        visual_blocks, visual_connections, task
+                    )
+                )
+                loop.close()
+                
+                return jsonify({
+                    "status": "executed",
+                    "result": result
+                })
+            except Exception as e:
+                return jsonify({"error": str(e)}), 500
+        else:
+            # Start background task for complex workflows
+            task_id = task_manager.start_task(
+                visual_blocks, visual_connections, task, controller
             )
-        )
+            
+            return jsonify({
+                "status": "started",
+                "task_id": task_id,
+                "message": "Complex workflow started in background. Use /task_status/{task_id} to check progress."
+            })
         
-        return jsonify({
-            "status": "executed",
-            "result": result
-        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/task_status/<task_id>')
+def get_task_status(task_id):
+    """Get the status of a background task."""
+    try:
+        task_info = task_manager.get_task_status(task_id)
+        
+        if not task_info:
+            return jsonify({"error": "Task not found"}), 404
+        
+        return jsonify(task_info)
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/tasks')
+def list_tasks():
+    """List all background tasks."""
+    try:
+        tasks = task_manager.list_tasks()
+        return jsonify({"tasks": tasks})
+        
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/cancel_task/<task_id>', methods=['POST'])
+def cancel_task(task_id):
+    """Cancel a running background task."""
+    try:
+        success = task_manager.cancel_task(task_id)
+        
+        if success:
+            return jsonify({"status": "cancelled", "task_id": task_id})
+        else:
+            return jsonify({"error": "Task not found or not running"}), 404
         
     except Exception as e:
         return jsonify({"error": str(e)}), 500

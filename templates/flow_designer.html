@@ -1455,6 +1455,14 @@
                     validationMessage += 'Warnings:\n' + warnings + '\n\n';
                 }
                 
+                // Check if this is a complex workflow
+                const isComplexWorkflow = blocksArray.length > 4;
+                if (isComplexWorkflow) {
+                    validationMessage += '⚠️ Complex workflow detected (>4 blocks).\n';
+                    validationMessage += 'This will run in background and may take up to 25 minutes.\n';
+                    validationMessage += 'You will receive progress updates.\n\n';
+                }
+                
                 validationMessage += 'Continue with execution?';
                 
                 if (validationMessage && !confirm(validationMessage)) {
@@ -1497,6 +1505,13 @@
                     console.error('[FRONTEND] ERROR: Execution error in result');
                     console.error('[FRONTEND] Error details:', result.error);
                     alert('Execution error: ' + result.error);
+                } else if (result.status === 'started') {
+                    // Background task started
+                    console.log('[FRONTEND] Background task started:', result.task_id);
+                    executeButton.innerHTML = '⏳ Running in Background...';
+                    
+                    // Start polling for progress
+                    pollTaskProgress(result.task_id, executeButton, originalText, content);
                 } else {
                     console.log('[FRONTEND] Step 3: Showing execution results');
                     // Show enhanced results in a new window
@@ -1511,11 +1526,90 @@
                 alert('Error executing flow: ' + error.message);
             })
             .finally(() => {
-                console.log('[FRONTEND] Restoring button state');
-                executeButton.innerHTML = originalText;
-                executeButton.disabled = false;
+                // Only restore button if not running background task
+                if (!executeButton.innerHTML.includes('Background')) {
+                    console.log('[FRONTEND] Restoring button state');
+                    executeButton.innerHTML = originalText;
+                    executeButton.disabled = false;
+                }
                 console.log('[FRONTEND] executeFlow function completed');
             });
+        }
+
+        function pollTaskProgress(taskId, executeButton, originalText, content) {
+            console.log('[FRONTEND] Starting progress polling for task:', taskId);
+            
+            const pollInterval = setInterval(() => {
+                fetch(`/task_status/${taskId}`)
+                .then(response => response.json())
+                .then(taskInfo => {
+                    console.log('[FRONTEND] Task progress:', taskInfo);
+                    
+                    if (taskInfo.status === 'running') {
+                        const progress = taskInfo.progress || 0;
+                        const eta = taskInfo.eta_formatted || 'calculating...';
+                        const step = taskInfo.current_step || 'Processing...';
+                        
+                        executeButton.innerHTML = `⏳ ${progress}% - ${step} (ETA: ${eta})`;
+                        
+                    } else if (taskInfo.status === 'completed') {
+                        clearInterval(pollInterval);
+                        console.log('[FRONTEND] Task completed successfully');
+                        
+                        executeButton.innerHTML = originalText;
+                        executeButton.disabled = false;
+                        
+                        // Show results
+                        const result = { status: 'executed', result: taskInfo.result };
+                        showExecutionResults(result, content);
+                        
+                    } else if (taskInfo.status === 'failed') {
+                        clearInterval(pollInterval);
+                        console.error('[FRONTEND] Task failed:', taskInfo.error);
+                        
+                        executeButton.innerHTML = originalText;
+                        executeButton.disabled = false;
+                        
+                        alert('Task failed: ' + taskInfo.error);
+                        
+                    } else if (taskInfo.status === 'cancelled') {
+                        clearInterval(pollInterval);
+                        console.log('[FRONTEND] Task was cancelled');
+                        
+                        executeButton.innerHTML = originalText;
+                        executeButton.disabled = false;
+                        
+                        alert('Task was cancelled');
+                    }
+                })
+                .catch(error => {
+                    console.error('[FRONTEND] Error polling task status:', error);
+                    clearInterval(pollInterval);
+                    
+                    executeButton.innerHTML = originalText;
+                    executeButton.disabled = false;
+                    
+                    alert('Error checking task progress: ' + error.message);
+                });
+            }, 2000); // Poll every 2 seconds
+            
+            // Add cancel button functionality
+            executeButton.onclick = () => {
+                if (confirm('Cancel the running task?')) {
+                    fetch(`/cancel_task/${taskId}`, { method: 'POST' })
+                    .then(response => response.json())
+                    .then(result => {
+                        console.log('[FRONTEND] Task cancellation result:', result);
+                        clearInterval(pollInterval);
+                        executeButton.innerHTML = originalText;
+                        executeButton.disabled = false;
+                        executeButton.onclick = executeFlow; // Restore original function
+                    })
+                    .catch(error => {
+                        console.error('[FRONTEND] Error cancelling task:', error);
+                    });
+                }
+            };
         }
         
         function showExecutionResults(result, originalContent) {
