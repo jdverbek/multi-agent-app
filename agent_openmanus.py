@@ -272,14 +272,14 @@ try:
     # Title slide
     title_slide_layout = prs.slide_layouts[0]  # Title slide layout
     slide = prs.slides.add_slide(title_slide_layout)
-    title = slide.shapes.title
-    subtitle = slide.placeholders[1]
+    title_shape = slide.shapes.title
+    subtitle_shape = slide.placeholders[1]
     
-    title.text = "{title}"
-    subtitle.text = "Exploring the Latest Developments and Applications"
+    title_shape.text = "{title}"
+    subtitle_shape.text = "Exploring the Latest Developments and Applications"
     
-    # Content slides
-    slides_data = {repr(slides)}
+    # Content slides data
+    slides_data = {slides}
     
     for slide_info in slides_data:
         # Add content slide
@@ -301,9 +301,10 @@ try:
             p.level = 0
             
             # Format bullet points
-            run = p.runs[0] if p.runs else p.add_run()
-            run.font.name = "Arial"
-            run.font.size = Pt(18)
+            if p.runs:
+                run = p.runs[0]
+                run.font.name = "Arial"
+                run.font.size = Pt(18)
     
     # Save presentation
     filepath = "/tmp/{filename}"
@@ -330,15 +331,15 @@ except Exception as e:
 '''
             
             # Execute the Python code
-            result = self.tools.execute_python(python_code)
+            result = self.tools.python_execute(python_code)
             
             if result['success']:
                 return result['output']
             else:
-                return f"PowerPoint creation failed: {{result['error']}}"
+                return f"PowerPoint creation failed: {result['error']}"
                 
         except Exception as e:
-            return f"Complex PowerPoint creation error: {{str(e)}}"
+            return f"Complex PowerPoint creation error: {str(e)}"
     
     async def _create_simple_presentation(self, task: Task) -> str:
         """Create a simple single-slide presentation for basic requests."""
